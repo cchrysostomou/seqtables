@@ -12,7 +12,9 @@ It also lets you associate quality score information for each sequence. This all
 
 ## Dependencies
 This program currently only works on python2
+
 pandas
+
 numpy
 
 ## Optional dependencies
