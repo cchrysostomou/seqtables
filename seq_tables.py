@@ -6,7 +6,7 @@ and accessing specific positions of an aligned sequence**
 import pandas as pd
 import numpy as np
 from plotly import graph_objs as go
-from Bio import SeqIO
+
 import gc
 import copy
 import warnings
@@ -526,6 +526,7 @@ def read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=Tru
         seqs = list(grouped.get_group(1)[0])
         quals = list(grouped.get_group(3)[0])
     else:
+        from Bio import SeqIO
         seqs = []
         quals = []
         header = []
