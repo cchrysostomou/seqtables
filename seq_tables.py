@@ -6,7 +6,7 @@ and accessing specific positions of an aligned sequence**
 import pandas as pd
 import numpy as np
 from plotly import graph_objs as go
-
+from Bio import SeqIO
 import gc
 import copy
 import warnings
@@ -32,11 +32,11 @@ degen_to_base = {
 dna_alphabet = list('ACTG') + list(set(sorted(degen_to_base.values())) - set('ACTG')) + ['-.']
 aa_alphabet = list('ACDEFGHIKLMNPQRSTVWYX*Z-.')
 
+
 def strseries_to_bytearray(series, fillvalue):
     max_len = series.apply(len).max()
     series = series.apply(lambda x: x.ljust(max_len, fillvalue))
     seq_as_int = np.array(list(series)).view('S1').reshape((series.size, -1)).view(np.int8)
-    #seq_as_int = seq_as_char
     return (series, seq_as_int)
 
 
@@ -52,18 +52,18 @@ class seqtable():
         index (list of values defining the index, default=None):
 
             .. note::Index=None
-                
+
                 If None, then the index will result in default integer indexing by pandas.
 
         seqtype (string of 'AA' or 'NT', default='NT'): Defines the format of the data being passed into the dataframe
         phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
-    
+
     Attributes:
         seq_df (Dataframe): Each row in the dataframe is a sequence. It will always contain a 'seqs' column representing the sequences past in. Optionally it will also contain a 'quals' column representing quality scores
         seq_table (Dataframe): Dataframe representing sequences as characters in a table. Each row in the dataframe is a sequence. Each column represents the position of a base/residue within the sequence. The 4th position of sequence 2 is found as seq_table.ix[1, 4]
         qual_table (Dataframe, optional): Dataframe representing the quality score for each character in seq_table
-    
-    Examples: 
+
+    Examples:
         >>> sq = seq_tables.seqtable(['AAA', 'ACT', 'ACA'])
         >>> sq.hamming_distance('AAA')
         >>> sq = read_fastq('fastqfile.fq')
@@ -71,36 +71,26 @@ class seqtable():
 
     """
     def __init__(self, seqdata=None, qualitydata=None, start=1, index=None, seqtype='NT', phred_adjust=33, null_qual='!', **kwargs):
-    
         self.null_qual = null_qual
         self.start = start
         if seqtype not in ['AA', 'NT']:
             raise Exception('You defined seqtype as, {0}. We only allow seqtype to be "AA" or "NT"'.format(seqtype))
-        
         self.seqtype = seqtype
         self.phred_adjust = phred_adjust
-    
         self.fillna_val = 'N' if seqtype == 'NT' else 'X'
-        
         if seqdata is not None:
             self.index = index
             self._seq_to_table(seqdata)
             self.qual_table = None
-
             if (isinstance(qualitydata, pd.Series) and qualitydata.empty is False) or qualitydata is not None:
                 self.qual_to_table(qualitydata, phred_adjust, return_table=False)
-        
+
     def __len__(self):
         return self.seq_list.shape[0]
 
     def __getitem__(self, key):
-        pass
-        # stable = self.seq_table.__getitem__(key)
-        # if self.qual_table:
-        #     qtable = self.qual_table.__getitem__(key)
-        # else:
-        #     qtable = None
-        # return SeqTable(None, copy_constructor={'seqs': stable, 'quals': qtable, 'seqtype': self.seqtype, 'phred_adjust': self.phred_adjust, 'memory_safe': self.memory_safe, 'alphabet': self.alphabet})
+        seq_table = self.seq_table.__getitem__(key)
+        return self.copy_using_template(seq_table)
 
     def loc(self, key):
         pass
@@ -111,22 +101,24 @@ class seqtable():
         #     qtable = None
         # return SeqTable(None, copy_constructor={'seqs': stable, 'quals': qtable, 'seqtype': self.seqtype, 'phred_adjust': self.phred_adjust, 'memory_safe': self.memory_safe, 'alphabet': self.alphabet})
 
+    def copy_using_template(self, template):
+        new_member = seqtable(seqtype=self.seqtype, phred_adjust=self.phred_adjust, null_qual=self.null_qual)
+        if self.qual_table is not None:
+            qual_table = self.qual_table.loc[template.index, template.columns]
+        else:
+            qual_table = None
+        seqs = self.slice_sequences(template.columns).loc[template.index]
+        new_member.seq_df = seqs
+        new_member.seq_table = template
+        new_member.qual_table = qual_table
+        new_member.index = template.index
+        return new_member
+
     def view_bases(self, as_dataframe=False):
         return self.seq_table.values.view('S1')
-        #return self.seq_table.values.view('S1') if as_dataframe is False else pd.DataFrame(list(list(self.seq_table.values.view('S1'))), dtype='category', )
 
-#    def update(self):
-#        pass
-
-#    def append(self, seqlist, quallist=None, index=None):
-        # if isinstance(seqlist, list):
-        #     seqlist = pd.Series(seqlist)
-        # # if self.qual_table is None:
-        # #     self.seq_table = seqlist
-        # # self.seq_table = pd.concat([self.seq_table, seqlist])
-        # # if quallist:
-        # #     self.qual_table = pd.concat([self.qual_table])
-        # pass
+    def shape(self):
+        return self.seq_table.shape
 
     def __repr__(self):
         return self.seq_df.__repr__()
@@ -140,7 +132,7 @@ class seqtable():
     def subsample(self, numseqs):
         """
             Return a random sample of sequences as a new object
-            
+
             Args:
                 numseqs (int): How many sequences to sample
 
@@ -148,13 +140,12 @@ class seqtable():
                 SeqTable Object
         """
         random_sequences = self.seq_df.sample(numseqs)
-        
+
         if 'quals' in random_sequences:
             random_qualities = random_sequences['quals']
         else:
-            random_qualities = None        
-        return seqtable(random_sequences['seqs'], random_qualities, self.start, index=random_sequences.index, seqtype=self.seqtype,phred_adjust=self.phred_adjust)
-
+            random_qualities = None
+        return seqtable(random_sequences['seqs'], random_qualities, self.start, index=random_sequences.index, seqtype=self.seqtype, phred_adjust=self.phred_adjust)
 
     def update_seqdf(self):
         """
@@ -164,16 +155,15 @@ class seqtable():
         """
         self.seq_df = self.slice_sequences(self.seq_table.columns)
 
-
     def qual_to_table(self, qualphred, phred_adjust=33, return_table=False):
         """
             Given a set of quality score strings, updates the  return a new dataframe such that each column represents the quality at each position as a number
-            
+
             Args:
                 qualphred: (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)
                 phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
                 return_table (boolean, default=False): If True, then the attribute self.qual_table is returned
-            
+
             Returns:
                 self.qual_table (Dataframe): each row corresponds to a specific sequence and each column corresponds to
 
@@ -186,13 +176,12 @@ class seqtable():
 
         self.seq_df['quals'] = list(qual_list)
         self.qual_table -= self.phred_adjust
-    
+
         self.qual_table = pd.DataFrame(self.qual_table, index=self.index, columns=range(self.start, self.qual_table.shape[1] + self.start))
-            
+
         if self.qual_table.shape != self.seq_table.shape:
             raise Exception("The provided quality list does not match the format of the sequence list. Shape of sequences {0}, shape of quality {1}".format(str(self.seq_table.shape), str(self.qual_table.shape)))
         return self.qual_table
-
 
     def _seq_to_table(self, seqlist):
         """
@@ -201,25 +190,22 @@ class seqtable():
             .. important::Private function
 
                 This function is not for public use
-        
         """
         if isinstance(seqlist, list):
             seq_list = pd.Series(seqlist)
         else:
             seq_list = seqlist
-            
+
         (seq_list, self.seq_table) = strseries_to_bytearray(seq_list, self.fillna_val)
         self.seq_df = pd.DataFrame(list(seq_list), index=self.index, columns=['seqs'])
 
         self.seq_table = pd.DataFrame(self.seq_table, index=self.index, columns=range(self.start, self.seq_table.shape[1] + self.start))
-            
 
     def table_to_seq(self, new_name):
         """
             Return the sequence list
         """
         return self.seq_list
-
 
     def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False, set_diff=False, ignore_characters=[]):
         """
@@ -232,15 +218,17 @@ class seqtable():
                 flip (bool): If True, then find bases that ARE MISMATCHES(NOT equal) to the reference
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
                 ignore_characters (char or list of chars): When performing distance/finding mismatches, always treat these characters as matches
+
             Returns:
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
+
         compare_column_header = self.seq_table.columns
         if ref_start < 0:
             # simple: the reference sequence is too long, so just trim it
-            reference_seq[(-1 * ref_start):]
+            reference_seq = reference_seq[(-1 * ref_start):]
         elif ref_start > 0:
-            reference_seq = 'N' * ref_start + reference_seq
+            reference_seq = self.fillna_val * ref_start + reference_seq
             # more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not
             # found in reference sequence provided
             if positions is None:
@@ -251,28 +239,31 @@ class seqtable():
             if len(positions) < len(before_filter):
                 warnings.warn("Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}".format(','.join([_ for _ in before_filter[:ref_start]])))
             compare_column_header = compare_column_header[ref_start:]
-        
+
         # adjust reference length
-        reference_seq = reference_seq[:self.seq_table.shape[1]]
+        if len(reference_seq) > self.seq_table.shape[1]:
+            reference_seq = reference_seq[:self.seq_table.shape[1]]
+        elif len(reference_seq) < self.seq_table.shape[1]:
+            reference_seq = reference_seq + self.fillna_val * (self.seq_table.shape[1] - len(reference_seq))
+
         if set_diff is True:
             # change positions of interest to be the SET DIFFERENCE of positions parameter
             if positions is None:
                 raise Exception('You cannot analyze the setdifferene of all positions. Returns a non-informative answer (no columns to compare)')
             positions = list(set(compare_column_header) - set(positions))
-        
+
         # determine which columns we should look at
         if positions is None:
             ref_cols = [i for i in range(len(compare_column_header))]
             positions = compare_column_header
         else:
-            ref_cols = [i for i,c in enumerate(compare_column_header) if c in positions]
-        
+            ref_cols = [i for i, c in enumerate(compare_column_header) if c in positions]
+
         # convert reference to numbers
         reference_array = np.array(bytearray(reference_seq))[ref_cols]
-        
-        # actually perform the hamming distance
-        diffs = self.seq_table[positions].values == reference_array if flip is False else self.seq_table[positions].values != reference_array
-        
+        # actually compare distances in each letter (find positions which are equal)
+        diffs = self.seq_table[positions].values == reference_array  # if flip is False else self.seq_table[positions].values != reference_array
+
         if ignore_characters:
             if not isinstance(ignore_characters, list):
                 ignore_characters = [ignore_characters]
@@ -281,11 +272,14 @@ class seqtable():
             ignore_pos = (self.seq_table[positions].values == ignore_characters[0]) | (reference_array == ignore_characters[0])
             for chr_p in range(1, len(ignore_characters)):
                 ignore_pos = ignore_pos | (self.seq_table[positions].values == ignore_characters[chr_p]) | (reference_array == ignore_characters[chr_p])
-            # now adjust boolean results to ignore any positions == ignore_characters
-            diffs = diffs | ignore_pos if flip is False else diffs & ignore_pos
-        
-        return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool)
 
+            # now adjust boolean results to ignore any positions == ignore_characters
+            diffs = (diffs | ignore_pos)  # if flip is False else (diffs | ignore_pos)
+
+        if flip:
+            diffs = ~diffs
+
+        return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool)
 
     def hamming_distance(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[]):
         """
@@ -297,10 +291,9 @@ class seqtable():
                 ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
         """
-        diffs =  self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
+        diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
         return diffs.sum(axis=1)
 
-    
     def quality_filter(self, q, p, inplace=False, ignore_null_qual=True):
         """
             Filter out sequences based on their average qualities at each base/position
@@ -348,22 +341,43 @@ class seqtable():
         if inplace is False:
             return meself
 
-
     def slice_sequences(self, positions, name='seqs', return_quality=False):
+        positions = [p for p in positions]
+        num_chars = len(positions)
+        
+        if num_chars > len(self.seq_table.columns):
+            new_positions = [p for p in positions if p in self.seq_table.columns]
+            prepend = ''.join(['N' for p in positions if p < self.seq_table.columns[0]])
+            append = ''.join(['N' for p in positions if p > self.seq_table.columns[-1]])
+            positions = new_positions
+            num_chars = len(positions)
+            warnings.warn("The sequences do not cover all positions requested. N's will be appended and prepended to sequences as necessary")
+        else:
+            prepend = ''
+            append = ''
+
         if positions == []:
             if return_quality:
-                return pd.DataFrame('',columns=['seqs', 'quals'], index=self.index)
+                qual_empty = '!' * (len(prepend) + len(append))
+                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty },columns=['seqs', 'quals'], index=self.index)
             else:
-                return pd.DataFrame('',columns=['seqs'], index=self.index)
-        num_chars = len(positions)
+                return pd.DataFrame(prepend + append,columns=['seqs'], index=self.index)
+        
         substring = pd.DataFrame({name:self.seq_table.loc[:, positions].values.copy().view('S{0}'.format(num_chars)).ravel()}, index=self.index)
         
+        if prepend or append:
+            substring['seqs'] = substring['seqs'].apply(lambda x: prepend + x + append)
+
         if not self.qual_table is None and return_quality:
             subquality = self.qual_table.loc[:, positions].values
             subquality = (subquality + self.phred_adjust).copy().view('S{0}'.format(num_chars)).ravel()
             substring['quals'] = subquality
-        return substring
+            if prepend or append:
+                prepend = '!' * len(prepend)
+                append = '!' * len(append)
+                substring['quals'] = substring['quals'].apply(lambda x: prepend + x + append)
 
+        return substring
 
     def get_seq_dist(self, positions=None):
         """
@@ -374,10 +388,24 @@ class seqtable():
         dist.rename({c: chr(c) for c in list(dist.index)}, inplace=True)
         return dist
 
+    def get_consensus(self, positions=None, modecutoff=0.5):
+        """
+            Returns the sequence consensus of the bases at the defined positions
+
+            Args:
+                positions: Slice which positions in the table should be conidered
+                modecutoff: Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)
+        """
+        compare = self.seq_table.loc[:, positions] if positions else self.seq_table
+        cutoff = float(compare.shape[0]) * modecutoff
+        chars = compare.shape[1]
+        dist = np.int8(compare.apply(lambda x: x.mode()).values[0])
+        dist[(compare.values == dist).sum(axis=0) <= cutoff] = ord('N')
+        seq = dist.view('S' + str(chars))[0]
+        return seq
 
     def seq_logo(self):
         pass
-            
 
     def get_quality_dist(self, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None):
         """
@@ -393,7 +421,7 @@ class seqtable():
                 percentiles (list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]): value passed into pandas describe() function.
                 exclude_null_quality (boolean, default=True): do not include quality scores of 0 in the distribution
                 sample (int, default=None): If defined, then we will only calculate the distribution on a random subsampled population of sequences
-            
+    
             Returns:
                 data (DataFrame): contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
                 graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards
@@ -428,7 +456,7 @@ class seqtable():
                 (200, 204), (205, 209), (210, 214), (215, 219), (220, 224), (225, 229), (230, 234), (235, 239), (240, 244), (245, 249), (250, 254), (255, 259), (260, 264), (265, 269), (270, 274), (275, 279), (280, 284), (285, 289), (290, 294), (295, 299),
                 300
             ]
-            bins = [x  if isinstance(x, int) else (x[0] , x[1] ) for x in bins]
+            bins = [x if isinstance(x, int) else (x[0], x[1]) for x in bins]
         else:
             # just in case its a generator (i.e. range function)
             bins = [x for x in bins]
@@ -438,7 +466,7 @@ class seqtable():
             if isinstance(b, int):
                 binnames[str(b)] = (b, b)
             elif len(b) == 2:
-                binnames[str(b[0] ) + '-' + str(b[1])] = (b[0], b[1])
+                binnames[str(b[0]) + '-' + str(b[1])] = (b[0], b[1])
 
         def get_binned_cols(column):
             # use this function to group together columns
@@ -526,7 +554,6 @@ def read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=Tru
         seqs = list(grouped.get_group(1)[0])
         quals = list(grouped.get_group(3)[0])
     else:
-        from Bio import SeqIO
         seqs = []
         quals = []
         header = []
