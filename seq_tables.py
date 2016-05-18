@@ -5,8 +5,19 @@ and accessing specific positions of an aligned sequence**
 
 import pandas as pd
 import numpy as np
-from plotly import graph_objs as go
-from Bio import SeqIO
+try:
+    from plotly import graph_objs as go
+    plotly_installed = True
+except:
+    plotly_installed = False
+    warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
+
+try:
+    from Bio import SeqIO
+    bio_installed = True
+except:
+    bio_installed = False
+
 import gc
 import copy
 import warnings
@@ -509,7 +520,8 @@ class seqtable():
             median = g.loc['50%']
             # now only store the values the user wanted
             g = g.drop(program_added_values.values())
-            return (g, go.Box(
+            if plotly_installed:
+                plotdata = go.Box(
                     y=sample_data,
                     pointpos=0,
                     name=name,
@@ -523,22 +535,29 @@ class seqtable():
                     marker=dict(
                         color='rgb(107, 174, 214)',
                         size=3
-                    ),
-                    ), median
                     )
+                )
+            else:
+                plotdata = None
+
+            return (g, plotdata, median)
 
         # group results using the aggregation function defined above
         grouped_data = temp.groupby(get_binned_cols, axis=1).apply(lambda groups: agg_fxn(groups, percentiles))
-        
+
         labels = [b for b in binnames.keys() if b in grouped_data.keys()]
         data = pd.DataFrame(grouped_data.apply(lambda x: x[0])).transpose()[labels]
 
-        graphs = list(grouped_data.apply(lambda x: x[1]).transpose()[labels])
-        # median_vals = list(grouped_data.apply(lambda x: x[2]).transpose()[labels])
-        scatter_min = go.Scatter(x=data.columns, y=data.loc['min'], mode='markers', name='min', showlegend=False)
-        # scatter_median = go.Scatter(x=data.columns, y=median_vals, mode='line', name='median', line=dict(shape='spline')
-        scatter_mean = go.Scatter(x=data.columns, y=data.loc['mean'], mode='line', name='mean', line=dict(shape='spline'))
-        graphs.extend([scatter_min, scatter_mean])
+        if plotly_installed is True:
+            graphs = list(grouped_data.apply(lambda x: x[1]).transpose()[labels])
+            # median_vals = list(grouped_data.apply(lambda x: x[2]).transpose()[labels])
+            scatter_min = go.Scatter(x=data.columns, y=data.loc['min'], mode='markers', name='min', showlegend=False)
+            # scatter_median = go.Scatter(x=data.columns, y=median_vals, mode='line', name='median', line=dict(shape='spline')
+            scatter_mean = go.Scatter(x=data.columns, y=data.loc['mean'], mode='line', name='mean', line=dict(shape='spline'))
+            graphs.extend([scatter_min, scatter_mean])
+        else:
+            graphs = None
+
         return data, graphs
 
 
@@ -554,6 +573,8 @@ def read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=Tru
         seqs = list(grouped.get_group(1)[0])
         quals = list(grouped.get_group(3)[0])
     else:
+        if bio_installed is False:
+            raise Exception("You do not have BIOPYTHON installed and therefore must use pandas to read the fastq (set use_pandas parameter to True). If you would like to use biopython then please install")
         seqs = []
         quals = []
         header = []
