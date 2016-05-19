@@ -40,7 +40,7 @@ degen_to_base = {
     'CT': 'Y'
 }
 
-dna_alphabet = list('ACTG') + list(set(sorted(degen_to_base.values())) - set('ACTG')) + ['-.']
+dna_alphabet = list('ACTG') + sorted(list(set(sorted(degen_to_base.values())) - set('ACTG'))) + ['-.']
 aa_alphabet = list('ACDEFGHIKLMNPQRSTVWYX*Z-.')
 
 
@@ -78,8 +78,6 @@ class seqtable():
         >>> sq = seq_tables.seqtable(['AAA', 'ACT', 'ACA'])
         >>> sq.hamming_distance('AAA')
         >>> sq = read_fastq('fastqfile.fq')
-
-
     """
     def __init__(self, seqdata=None, qualitydata=None, start=1, index=None, seqtype='NT', phred_adjust=33, null_qual='!', **kwargs):
         self.null_qual = null_qual
@@ -89,6 +87,9 @@ class seqtable():
         self.seqtype = seqtype
         self.phred_adjust = phred_adjust
         self.fillna_val = 'N' if seqtype == 'NT' else 'X'
+        self.loc = seqtable_indexer(self, 'loc')
+        self.iloc = seqtable_indexer(self, 'iloc')
+        self.ix = seqtable_indexer(self, 'ix')
         if seqdata is not None:
             self.index = index
             self._seq_to_table(seqdata)
@@ -99,18 +100,18 @@ class seqtable():
     def __len__(self):
         return self.seq_list.shape[0]
 
+    def slice_object(self, method, params):
+        if method == 'loc':
+            seq_table = self.seq_table.loc[params]
+        elif method == 'iloc':
+            seq_table = self.seq_table.iloc[params]
+        elif method == 'ix':
+            seq_table = self.seq_table.ix[params]
+        return self.copy_using_template(seq_table)
+
     def __getitem__(self, key):
         seq_table = self.seq_table.__getitem__(key)
         return self.copy_using_template(seq_table)
-
-    def loc(self, key):
-        pass
-        # stable = self.seq_table.loc(key)
-        # if self.qual_table:
-        #     qtable = self.qual_table.__getitem__(key)
-        # else:
-        #     qtable = None
-        # return SeqTable(None, copy_constructor={'seqs': stable, 'quals': qtable, 'seqtype': self.seqtype, 'phred_adjust': self.phred_adjust, 'memory_safe': self.memory_safe, 'alphabet': self.alphabet})
 
     def copy_using_template(self, template):
         new_member = seqtable(seqtype=self.seqtype, phred_adjust=self.phred_adjust, null_qual=self.null_qual)
@@ -234,7 +235,7 @@ class seqtable():
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
 
-        compare_column_header = self.seq_table.columns
+        compare_column_header = list(self.seq_table.columns)
         if ref_start < 0:
             # simple: the reference sequence is too long, so just trim it
             reference_seq = reference_seq[(-1 * ref_start):]
@@ -260,18 +261,20 @@ class seqtable():
         if set_diff is True:
             # change positions of interest to be the SET DIFFERENCE of positions parameter
             if positions is None:
-                raise Exception('You cannot analyze the setdifferene of all positions. Returns a non-informative answer (no columns to compare)')
-            positions = list(set(compare_column_header) - set(positions))
-
-        # determine which columns we should look at
-        if positions is None:
-            ref_cols = [i for i in range(len(compare_column_header))]
-            positions = compare_column_header
+                raise Exception('You cannot analyze the set-difference of all positions. Returns a non-informative answer (no columns to compare)')
+            positions = sorted(list(set(compare_column_header) - set(positions)))
         else:
-            ref_cols = [i for i, c in enumerate(compare_column_header) if c in positions]
+            # determine which columns we should look at
+            if positions is None:
+                ref_cols = [i for i in range(len(compare_column_header))]
+                positions = compare_column_header
+            else:
+                positions = sorted(list(set(positions) & set(compare_column_header)))
+                ref_cols = [i for i, c in enumerate(compare_column_header) if c in positions]
 
         # convert reference to numbers
         reference_array = np.array(bytearray(reference_seq))[ref_cols]
+
         # actually compare distances in each letter (find positions which are equal)
         diffs = self.seq_table[positions].values == reference_array  # if flip is False else self.seq_table[positions].values != reference_array
 
@@ -290,7 +293,7 @@ class seqtable():
         if flip:
             diffs = ~diffs
 
-        return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool)
+        return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions)
 
     def hamming_distance(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[]):
         """
@@ -331,7 +334,6 @@ class seqtable():
         if inplace is False:
             return meself
 
-
     def convert_low_bases_to_null(self, q, replace_with=None, inplace=False):
         """
             This will convert all letters whose corresponding quality is below a cutoff to the value replace_with
@@ -352,17 +354,23 @@ class seqtable():
         if inplace is False:
             return meself
 
-    def slice_sequences(self, positions, name='seqs', return_quality=False):
+    def slice_sequences(self, positions, name='seqs', return_quality=False, empty_chars=None):
+        if empty_chars is None:
+            empty_chars = self.fillna_val
+
         positions = [p for p in positions]
         num_chars = len(positions)
-        
-        if num_chars > len(self.seq_table.columns):
+
+        # confirm that all positions are present in the column
+        missing_pos = set(positions) - set(self.seq_table.columns)
+
+        if len(missing_pos) > 0:
             new_positions = [p for p in positions if p in self.seq_table.columns]
-            prepend = ''.join(['N' for p in positions if p < self.seq_table.columns[0]])
-            append = ''.join(['N' for p in positions if p > self.seq_table.columns[-1]])
+            prepend = ''.join([empty_chars for p in positions if p < self.seq_table.columns[0]])
+            append = ''.join([empty_chars for p in positions if p > self.seq_table.columns[-1]])
             positions = new_positions
             num_chars = len(positions)
-            warnings.warn("The sequences do not cover all positions requested. N's will be appended and prepended to sequences as necessary")
+            warnings.warn("The sequences do not cover all positions requested. {0}'s will be appended and prepended to sequences as necessary".format(empty_chars))
         else:
             prepend = ''
             append = ''
@@ -370,16 +378,16 @@ class seqtable():
         if positions == []:
             if return_quality:
                 qual_empty = '!' * (len(prepend) + len(append))
-                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty },columns=['seqs', 'quals'], index=self.index)
+                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty}, columns=['seqs', 'quals'], index=self.index)
             else:
-                return pd.DataFrame(prepend + append,columns=['seqs'], index=self.index)
-        
-        substring = pd.DataFrame({name:self.seq_table.loc[:, positions].values.copy().view('S{0}'.format(num_chars)).ravel()}, index=self.index)
-        
+                return pd.DataFrame(prepend + append, columns=['seqs'], index=self.index)
+
+        substring = pd.DataFrame({name: self.seq_table.loc[:, positions].values.copy().view('S{0}'.format(num_chars)).ravel()}, index=self.index)
+
         if prepend or append:
             substring['seqs'] = substring['seqs'].apply(lambda x: prepend + x + append)
 
-        if not self.qual_table is None and return_quality:
+        if self.qual_table is not None and return_quality:
             subquality = self.qual_table.loc[:, positions].values
             subquality = (subquality + self.phred_adjust).copy().view('S{0}'.format(num_chars)).ravel()
             substring['quals'] = subquality
@@ -611,3 +619,12 @@ def read_sam(input_file, limit=None, chunk_size=100000, cleave_softclip=False, u
     df = pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines)
     index = df.index
     return seqtable(df[9], df[10], index, 'NT')
+
+
+class seqtable_indexer():
+    def __init__(self, obj, method):
+        self.obj = obj
+        self.method = method
+
+    def __getitem__(self, key):
+        return self.obj.slice_object(self.method, key)
