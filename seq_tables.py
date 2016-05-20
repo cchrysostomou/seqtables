@@ -2,7 +2,9 @@
 **We can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position
 and accessing specific positions of an aligned sequence**
 """
-
+import gc
+import copy
+import warnings
 import pandas as pd
 import numpy as np
 try:
@@ -18,9 +20,6 @@ try:
 except:
     bio_installed = False
 
-import gc
-import copy
-import warnings
 
 degen_to_base = {
     'GT': 'K',
@@ -107,7 +106,12 @@ class seqtable():
             seq_table = self.seq_table.iloc[params]
         elif method == 'ix':
             seq_table = self.seq_table.ix[params]
-        return self.copy_using_template(seq_table)
+        if isinstance(seq_table, pd.Series):
+            seq_table = pd.DataFrame(seq_table)
+        try:
+            return self.copy_using_template(seq_table)
+        except:
+            return self.copy_using_template(seq_table.transpose())
 
     def __getitem__(self, key):
         seq_table = self.seq_table.__getitem__(key)
@@ -119,6 +123,7 @@ class seqtable():
             qual_table = self.qual_table.loc[template.index, template.columns]
         else:
             qual_table = None
+        self.slice_sequences(template.columns)
         seqs = self.slice_sequences(template.columns).loc[template.index]
         new_member.seq_df = seqs
         new_member.seq_table = template
