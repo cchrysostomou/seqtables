@@ -46,7 +46,7 @@ aa_alphabet = list('ACDEFGHIKLMNPQRSTVWYX*Z-.')
 def strseries_to_bytearray(series, fillvalue):
     max_len = series.apply(len).max()
     series = series.apply(lambda x: x.ljust(max_len, fillvalue))
-    seq_as_int = np.array(list(series)).view('S1').reshape((series.size, -1)).view(np.int8)
+    seq_as_int = np.array(list(series), dtype='S').view('S1').reshape((series.size, -1)).view('uint8')
     return (series, seq_as_int)
 
 
