@@ -11,7 +11,7 @@ and anlayze the error rate; if looking at antibodies you can slice the CDR regio
 It also lets you associate quality score information for each sequence. This allows for quality filtering and converting bases with low quality scores.
 
 ## Dependencies
-This program currently only works on python2
+This program currently only works on python2 * fix should now work in python3 also
 
 pandas
 
