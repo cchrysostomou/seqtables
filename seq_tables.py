@@ -102,29 +102,45 @@ class seqtable():
     def slice_object(self, method, params):
         if method == 'loc':
             seq_table = self.seq_table.loc[params]
+            qual_table = self.qual_table.loc[params] if self.qual_table is not None else None
+            seq_df = self.seq_df.loc[params]
         elif method == 'iloc':
             seq_table = self.seq_table.iloc[params]
+            qual_table = self.qual_table.iloc[params] if self.qual_table is not None else None
+            seq_df = self.seq_df.iloc[params]
         elif method == 'ix':
             seq_table = self.seq_table.ix[params]
+            qual_table = self.qual_table.ix[params] if self.qual_table is not None else None
+            seq_df = self.seq_df.ix[params]
+        if isinstance(seq_table, pd.Series):
+            seq_table = pd.DataFrame(seq_table)
+        if isinstance(qual_table, pd.Series):
+            qual_table = pd.DataFrame(qual_table)
         if isinstance(seq_table, pd.Series):
             seq_table = pd.DataFrame(seq_table)
         try:
-            return self.copy_using_template(seq_table)
+            return self.copy_using_template(seq_table, seq_df, qual_table)
         except:
-            return self.copy_using_template(seq_table.transpose())
+            if isinstance(qual_table, pd.DataFrame):
+                return self.copy_using_template(seq_table.transpose(), seq_df.transpose(), qual_table.transpose())
+            else:
+                return self.copy_using_template(seq_table.transpose(), seq_df.transpose(), None)
 
     def __getitem__(self, key):
         seq_table = self.seq_table.__getitem__(key)
         return self.copy_using_template(seq_table)
 
-    def copy_using_template(self, template):
+    def copy_using_template(self, template, template_seqdf=None, template_qual=None):
         new_member = seqtable(seqtype=self.seqtype, phred_adjust=self.phred_adjust, null_qual=self.null_qual)
-        if self.qual_table is not None:
+        if template_qual is None and self.qual_table is not None:
             qual_table = self.qual_table.loc[template.index, template.columns]
         else:
             qual_table = None
-        self.slice_sequences(template.columns)
-        seqs = self.slice_sequences(template.columns).loc[template.index]
+        if template_seqdf is None:
+            self.slice_sequences(template.columns)
+            seqs = self.slice_sequences(template.columns).loc[template.index]
+        else:
+            seqs = template_seqdf
         new_member.seq_df = seqs
         new_member.seq_table = template
         new_member.qual_table = qual_table
@@ -224,7 +240,7 @@ class seqtable():
         """
         return self.seq_list
 
-    def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False, set_diff=False, ignore_characters=[]):
+    def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False, set_diff=False, ignore_characters=[], return_num_bases=False):
         """
             Calculate which positions within a reference are not equal in all sequences in dataframe
 
@@ -235,7 +251,12 @@ class seqtable():
                 flip (bool): If True, then find bases that ARE MISMATCHES(NOT equal) to the reference
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
                 ignore_characters (char or list of chars): When performing distance/finding mismatches, always treat these characters as matches
+                return_num_bases (bool): If true, returns a second argument defining the number of relevant bases present in each row
 
+                    ..important:: Change in output results
+
+                        Setting return_num_bases to true will change how results are returned (two elements rather than one are returned)
+            
             Returns:
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
@@ -298,9 +319,16 @@ class seqtable():
         if flip:
             diffs = ~diffs
 
-        return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions)
+        if return_num_bases:
+            if ignore_characters:
+                num_bases = len(positions) - ignore_pos.sum(axis=1)
+            else:
+                num_bases = len(positions)
+            return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions), num_bases
+        else:
+            return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions)
 
-    def hamming_distance(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[]):
+    def hamming_distance(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized=False):
         """
             Determine hamming distance of all sequences in dataframe to a reference sequence.
 
@@ -309,9 +337,14 @@ class seqtable():
                 positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare
                 ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
+                normalized (bool): If True, then divides hamming distance by the number of relevant bases
         """
-        diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
-        return diffs.sum(axis=1)
+        if normalized is True:
+            diffs, bases = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters, return_num_bases=True)
+            return pd.Series(diffs.values.sum(axis=1).astype(float) / bases, index=diffs.index)
+        else:
+            diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
+            return pd.Series(diffs.values.sum(axis=1), index=diffs.index)  # columns=c1, index=ind1)
 
     def quality_filter(self, q, p, inplace=False, ignore_null_qual=True):
         """
@@ -333,13 +366,13 @@ class seqtable():
         meself.qual_table = meself.qual_table[percent_above >= p]
         meself.seq_table = meself.seq_table.loc[meself.qual_table.index]
         meself.seq_df = meself.seq_df.loc[meself.qual_table.index]
-        bases = meself.seq_table.shape[1]
+        # bases = meself.seq_table.shape[1]
 
         self.shape = self.seq_table.shape
         if inplace is False:
             return meself
 
-    def convert_low_bases_to_null(self, q, replace_with=None, inplace=False):
+    def convert_low_bases_to_null(self, q, replace_with='N', inplace=False):
         """
             This will convert all letters whose corresponding quality is below a cutoff to the value replace_with
 
@@ -353,7 +386,7 @@ class seqtable():
 
         meself = self if inplace is True else self.copy()
         replace_with = ord(replace_with) if replace_with is not None else ord('N') if self.seqtype == 'NT' else ord('X')
-        meself.seq_table[meself.qual_table < q] = replace_with
+        meself.seq_table.values[meself.qual_table.values < q] = replace_with
         chars = self.seq_table.shape[1]
         meself.seq_df['seqs'] = list(meself.seq_table.values.copy().view('S' + str(chars)).ravel())
         if inplace is False:
