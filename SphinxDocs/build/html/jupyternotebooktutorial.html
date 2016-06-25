@@ -1,5 +1,6 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<!doctype html>
 
 
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -8,7 +9,7 @@
     
     <title>SEQ_TABLES TUTORIAL &mdash; Seq Table Documentation</title>
     
-    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/bizstyle.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
     <script type="text/javascript">
@@ -24,8 +25,12 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/bizstyle.js"></script>
     <link rel="top" title="Seq Table Documentation" href="index.html" />
-    <link rel="prev" title="Jumping into the source code for seqtables" href="to_the_code.html" /> 
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
   </head>
   <body role="document">
     <div class="related" role="navigation" aria-label="related navigation">
@@ -37,12 +42,42 @@
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="right" >
-          <a href="to_the_code.html" title="Jumping into the source code for seqtables"
-             accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">Seq Table Documentation</a> &raquo;</li> 
       </ul>
-    </div>  
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">SEQ_TABLES TUTORIAL</a><ul>
+<li><a class="reference internal" href="#what-does-the-class-do">What does the class do:</a><ul>
+<li><a class="reference internal" href="#some-warnings-before-using">SOME WARNINGS BEFORE USING</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#jupyter-ipython-notebook-exmples">Jupyter/ipython notebook exmples:</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/jupyternotebooktutorial.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
 
     <div class="document">
       <div class="documentwrapper">
@@ -50,7 +85,7 @@
           <div class="body" role="main">
             
   <div class="section" id="seq-tables-tutorial">
-<span id="seqtables"></span><h1>SEQ_TABLES TUTORIAL<a class="headerlink" href="#seq-tables-tutorial" title="Permalink to this headline">¶</a></h1>
+<span id="jupyternotebooktutorial"></span><h1>SEQ_TABLES TUTORIAL<a class="headerlink" href="#seq-tables-tutorial" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="what-does-the-class-do">
 <h2>What does the class do:<a class="headerlink" href="#what-does-the-class-do" title="Permalink to this headline">¶</a></h2>
 <p>Seq tables is to be used for viewing aligned sequences using pandas dataframes/numpy arrays. It will put lists or series of sequences and, optionally, quality scores into dataframes. Each sequence of tables in which each row is a specific sequence and each column is a specific position within the sequence. This allows useful slicing and determination of hamming distance between sequences</p>
@@ -169,14 +204,12 @@
 <span class="n">sq</span><span class="o">.</span><span class="n">view_bases</span><span class="p">()[:,</span> <span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span>
 </pre></div>
 </div>
-<dl class="docutils">
-<dt>array([[&#8216;A&#8217;, &#8216;A&#8217;],</dt>
-<dd><blockquote class="first">
-<div>[&#8216;C&#8217;, &#8216;T&#8217;],
-[&#8216;C&#8217;, &#8216;A&#8217;]],</div></blockquote>
-<p class="last">dtype=&#8217;<a href="#id3"><span class="problematic" id="id4">|</span></a>S1&#8217;)</p>
-</dd>
-</dl>
+<div class="highlight-default"><div class="highlight"><pre><span class="n">array</span><span class="p">([[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;A&#39;</span><span class="p">],</span>
+       <span class="p">[</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span>
+       <span class="p">[</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;A&#39;</span><span class="p">]],</span>
+      <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;|S1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 <p><strong>3. sq.qual_table =&gt; this represents the qualitysequence as actual quality bases</strong></p>
 <div class="code python highlight-default"><div class="highlight"><pre><span class="n">sq</span><span class="o">.</span><span class="n">qual_table</span>
 </pre></div>
@@ -984,42 +1017,6 @@ M01012:51:000000000-A4H0H:1:1101:23976:6937 1:N...  CCCCCDBBCCCDGGGGGGGGGGGGGGGG
           </div>
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
-  <ul>
-<li><a class="reference internal" href="#">SEQ_TABLES TUTORIAL</a><ul>
-<li><a class="reference internal" href="#what-does-the-class-do">What does the class do:</a><ul>
-<li><a class="reference internal" href="#some-warnings-before-using">SOME WARNINGS BEFORE USING</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#jupyter-ipython-notebook-exmples">Jupyter/ipython notebook exmples:</a></li>
-</ul>
-</li>
-</ul>
-
-  <h4>Previous topic</h4>
-  <p class="topless"><a href="to_the_code.html"
-                        title="previous chapter">Jumping into the source code for seqtables</a></p>
-  <div role="note" aria-label="source link">
-    <h3>This Page</h3>
-    <ul class="this-page-menu">
-      <li><a href="_sources/seqtables.txt"
-            rel="nofollow">Show Source</a></li>
-    </ul>
-   </div>
-<div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
-        </div>
-      </div>
       <div class="clearer"></div>
     </div>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -1031,9 +1028,6 @@ M01012:51:000000000-A4H0H:1:1101:23976:6937 1:N...  CCCCCDBBCCCDGGGGGGGGGGGGGGGG
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="right" >
-          <a href="to_the_code.html" title="Jumping into the source code for seqtables"
-             >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">Seq Table Documentation</a> &raquo;</li> 
       </ul>
     </div>

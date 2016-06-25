@@ -98,30 +98,69 @@ def strseries_to_bytearray(series, fillvalue):
 def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_properties=True, additional_text = {}, show_consensus=True, scale_by_distance=False, annotation_font_size=14, yaxistitle='', bargap=None, plotwidth=None, num_y_ticks = 3):
     """
     Uses plotly to generate a sequence logo as a series of bar graphs. This method of sequence logo is taken from the following source:
-    Repository: https://github.com/ISA-tools/SequenceLogoVis
-    Paper: E. Maguire, P. Rocca-Serra, S.-A. Sansone, and M. Chen, Redesigning the sequence logo with glyph-based approaches to aid interpretation, In Proceedings of EuroVis 2014, Short Paper (2014)
+
+        Repository: https://github.com/ISA-tools/SequenceLogoVis
+
+        Paper: E. Maguire, P. Rocca-Serra, S.-A. Sansone, and M. Chen, Redesigning the sequence logo with glyph-based approaches to aid interpretation, In Proceedings of EuroVis 2014, Short Paper (2014)
+
 
     Args:
-    seq_dist (Dataframe): Rows should be unique letters, Columns should be a specific position within the sequence,
-        Values should be the values that represent the frequency OR bits of a specific letter at a specific position
-    alphabet (string): AA or NT
-    label_cutoff (int, default=0.09): Defines a cutoff for when to stop adding 'text' labels to the plot (i.e. dont add labels for low freq letters)
-    use_properties (bool, default=True): If True and if the alphabet is AA then it will color AA by their properties
-    additional_text (list of tuples): for each tuple, element 0 is string/label, element 1 is string of letters at each position.
-        i.e. additional_text = [('text', 'AACCA'), ('MORE', 'ATTTT')]
-        This is meant to add extra layers of information for the sequence. For example may you would like to include the WT sequence at the bottom
-    show_consensus (bool): If True will show the consensus sequence at the bottom of the graph
-    scale_by_distance (bool): If True, then each x-coordinate of the bar graph will be equal to the column position in the dataframe.
-        For example if you are showing a motif in residues 10, 50, and 90 then the xcoordinates of the bars wil be 10, 50, 90 rather than 1,2,3
-    annotation_font_size (int): size of text font
-    yaxistitle (string): how to label the  y axis
-    bargap (float, default=None): bargap parameter for plots. If None, then lets plotly handle it
-    plotwidth (float, default=None): defines the total width of the plot and individual bars
-    num_y_ticks (int): How many ytick labels should appear in plot
+        seq_dist (Dataframe):
+            Rows should be unique letters, Columns should be a specific position within the sequence,
 
+            Values should be the values that represent the frequency OR bits of a specific letter at a specific position
+
+        alphabet (string): AA or NT
+
+        label_cutoff (int, default=0.09):
+            Defines a cutoff for when to stop adding 'text' labels to the plot (i.e. dont add labels for low freq letters)
+
+        use_properties (bool, default=True):
+            If True and if the alphabet is AA then it will color AA by their properties
+
+        additional_text (list of tuples):
+            For each tuple, element 0 is string/label, element 1 is string of letters at each position.
+
+            i.e. additional_text = [('text', 'AACCA'), ('MORE', 'ATTTT')]. This is meant to add extra
+
+            layers of information for the sequence. For example may you would like to include the WT sequence at the bottom
+
+        show_consensus (bool):
+            If True will show the consensus sequence at the bottom of the graph
+
+        scale_by_distance (bool):
+            If True, then each x-coordinate of the bar graph will be equal to the column position in the dataframe.
+
+            For example if you are showing a motif in residues 10, 50, and 90 then the xcoordinates of the bars wil be 10, 50, 90 rather than 1,2,3
+
+        annotation_font_size (int):
+            size of text font
+
+        yaxistitle (string):
+            how to label the  y axis
+
+        bargap (float, default=None):
+            bargap parameter for plots. If None, then lets plotly handle it
+
+        plotwidth (float, default=None):
+            defines the total width of the plot and individual bars
+
+        num_y_ticks (int):
+            How many ytick labels should appear in plot
 
     Returns:
-    fig (plotly.graph_objs.Figure): plot object for plotting in plotly
+        fig (plotly.graph_objs.Figure):
+            plot object for plotting in plotly
+
+    Examples:
+        >>> from seq_tables import draw_seqlogo_barplots
+        >>> import pandas as pd
+        >>> from plotly.offline import iplot, init_notebook_mode
+        >>> init_notebook_mode()
+        >>> distribution = pd.DataFrame({1: [0.9, 0.1, 0 ,0], 2: [0.5, 0.2, 0.1, 0.2], 3: [0, 0, 0, 1], 4: [0.25, 0.25, 0.25, 0.25]}, index=['A', 'C', 'T', 'G'])
+        >>> plotdata = draw_seqlogo_barplots(distribution)
+        >>> iplot(plotdata)
+
 
     """
     seq_dist = seq_dist.copy()
@@ -136,10 +175,10 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
     annotation = []
 
     if alphabet.lower() == 'nt':
-        colors = {c1: dna_colors[c1]['color'] for c1 in dna_colors.keys() + list(seq_dist.index)}
+        colors = {c1: dna_colors[c1]['color'] for c1 in list(dna_colors.keys()) + list(seq_dist.index)}
     elif alphabet.lower() == 'aa':
         if use_properties is True:
-            colors = {c1: amino_acid_color_properties[c1]['color'] for c1 in amino_acid_color_properties.keys() + list(seq_dist.index) }
+            colors = {c1: amino_acid_color_properties[c1]['color'] for c1 in list(amino_acid_color_properties.keys()) + list(seq_dist.index) }
 
     labels = seq_dist.columns
     if scale_by_distance is False:
@@ -151,7 +190,7 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
         max_dist = max(seq_dist.columns) + 1
 
     if plotwidth is None:
-        plotwidth=((350/6.0) * seq_dist.shape[1])
+        plotwidth=max(400, ((350/6.0) * seq_dist.shape[1]))
 
     cnt = 0
     for i in seq_dist.columns:
@@ -664,7 +703,8 @@ class seqtable():
                 ref_cols = [i for i, c in enumerate(compare_column_header) if c in positions]
 
         # convert reference to numbers
-        reference_array = np.array(bytearray(reference_seq))[ref_cols]
+        # reference_array = np.array(bytearray(reference_seq))[ref_cols]
+        reference_array = np.array([reference_seq], dtype='S').view(np.uint8)[ref_cols]
 
         # actually compare distances in each letter (find positions which are equal)
         diffs = self.seq_table[positions].values == reference_array  # if flip is False else self.seq_table[positions].values != reference_array

@@ -1,0 +1,1354 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "SEATTLE_BLUEBIRD" "1" "May 11, 2016" "0.5" "seattle_bluebird"
+.SH NAME
+seattle_bluebird \- seattle_bluebird Documentation
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.sp
+Contents:
+.SH SEQ_TABLES TUTORIAL
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Seq tables will take in sequences and quality scores and put them into dataframe. In addition, each sequence
+of tables in which each row is a specific sequence and each column is a specific position within the sequence.
+this allows useful slicing and determination of hamming distance between sequences
+"""
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+import sys
+import seq_tables
+from plotly.offline import iplot, init_notebook_mode
+import numpy as np
+import pandas as pd
+from plotly import graph_objs as go
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+%load_ext autoreload
+%autoreload 2
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+init_notebook_mode()
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+There are multiple ways to initialize this class. Essentially it just needs a list of aligned sequences to one another.
+If you would like to you could also past in a list of quality scores
+"""
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+seqs = [\(aqAAA\(aq, \(aqACT\(aq, \(aqACA\(aq]
+quals = [\(aqZCA\(aq, \(aqDGJ\(aq, \(aqJJJ\(aq]
+sq = seq_tables\&.seqtable(seqs, quals)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# This class has three important attributes
+# 1) sq.seq_df => returns a dataframe of the original sequence and/or quality
+sq\&.seq_df
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# 2) sq.seq_table => this represents all letters in the sequences as a table of rows/columns of ascii values
+sq\&.seq_table
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# if you would like, you could view the letters as actual letters instead of ascii
+sq\&.view_bases()
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+array([[\(aqA\(aq, \(aqA\(aq, \(aqA\(aq],
+       [\(aqA\(aq, \(aqC\(aq, \(aqT\(aq],
+       [\(aqA\(aq, \(aqC\(aq, \(aqA\(aq]],
+      dtype=\(aq
+.nf
+|
+.fi
+S1\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# Now we can slice select positions
+sq\&.view_bases()[:, 1:3]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+array([[\(aqA\(aq, \(aqA\(aq],
+       [\(aqC\(aq, \(aqT\(aq],
+       [\(aqC\(aq, \(aqA\(aq]],
+      dtype=\(aq
+.nf
+|
+.fi
+S1\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# 3) sq.qual_table => this represents the qualitysequence as actual quality bases
+sq\&.qual_table
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Now lets actualy load real data from a fastq file
+"""
+sq = seq_tables\&.read_fastq("test/Demo.fq")
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.view_bases()
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+array([[\(aqG\(aq, \(aqN\(aq, \(aqC\(aq, ..., \(aqT\(aq, \(aqG\(aq, \(aqA\(aq],
+       [\(aqG\(aq, \(aqG\(aq, \(aqA\(aq, ..., \(aqT\(aq, \(aqC\(aq, \(aqC\(aq],
+       [\(aqC\(aq, \(aqG\(aq, \(aqT\(aq, ..., \(aqA\(aq, \(aqA\(aq, \(aqC\(aq],
+       ...,
+       [\(aqG\(aq, \(aqG\(aq, \(aqA\(aq, ..., \(aqA\(aq, \(aqG\(aq, \(aqC\(aq],
+       [\(aqG\(aq, \(aqC\(aq, \(aqC\(aq, ..., \(aqA\(aq, \(aqC\(aq, \(aqA\(aq],
+       [\(aqG\(aq, \(aqG\(aq, \(aqA\(aq, ..., \(aqG\(aq, \(aqC\(aq, \(aqC\(aq]],
+      dtype=\(aq
+.nf
+|
+.fi
+S1\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.seq_table\&.shape
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+(3000, 250)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+We can get a distribution of the quality scores in the data
+"""
+(dist, plotsmade) = sq\&.get_quality_dist()
+dist
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+The function get_quality_dist also returns plot objects that can be used by plotly
+"""
+iplot(plotsmade)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Filter out low quality sequences
+"""
+sq\&.quality_filter(q=20, p=50)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                                                                                                 seqs  M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N...  GNCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N...  GGAGGAGACGATGACTTCGGTCCCGTGGCCCCATGCGTCGATACAG...
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N...  CGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAGGA...
+
+                                                                                                quals
+M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N...  B#>AABCCCCCCGGGGGGGGGGGGGGEGGGGGHHHHHGGGGGGGGG...
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N...  A@ABB@A>AADAGGGGGGGGFGGHGH2EEBGEEHHHGGGGGFGGGH...
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N...  AAAAAA>>>>>1BE1AEBFFGG0EEGCGEFCC>FGGGG/EEEEGGG...
+
+[2963 rows x 2 columns]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Convert any low quality bases to N
+"""
+sq\&.convert_low_bases_to_null(q=20)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                                                                                                 seqs  M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N...  GNCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N...  GGAGGAGACGATGACTTCGGTCCCGTNGCCCCATGCGTCGATACAG...
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N...  CGTGACGTTGGNCGNGTCCGGGNGCGGCCTCCAGACGCNCGGAGGA...
+
+                                                                                                quals
+M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N...  B#>AABCCCCCCGGGGGGGGGGGGGGEGGGGGHHHHHGGGGGGGGG...
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N...  A@ABB@A>AADAGGGGGGGGFGGHGH2EEBGEEHHHGGGGGFGGGH...
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N...  AAAAAA>>>>>1BE1AEBFFGG0EEGCGEFCC>FGGGG/EEEEGGG...
+
+[3000 rows x 2 columns]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Get the hamming distances of all sequences to the first sequence
+"""
+sq\&.hamming_distance(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq])
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f1::552c261b9eb6363a487b62c9"}      0
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f2::552c261b9eb6363a487b62c9"}    189
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f3::552c261b9eb6363a487b62c9"}    190
+M01012:51:000000000\-A4H0H:1:1101:14011:1558 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f4::552c261b9eb6363a487b62c9"}     43
+M01012:51:000000000\-A4H0H:1:1101:16697:1561 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f5::552c261b9eb6363a487b62c9"}    197
+M01012:51:000000000\-A4H0H:1:1101:14388:1594 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f6::552c261b9eb6363a487b62c9"}    189
+M01012:51:000000000\-A4H0H:1:1101:16245:1601 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f7::552c261b9eb6363a487b62c9"}    196
+M01012:51:000000000\-A4H0H:1:1101:14065:1607 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f8::552c261b9eb6363a487b62c9"}     50
+M01012:51:000000000\-A4H0H:1:1101:15481:1612 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f9::552c261b9eb6363a487b62c9"}     92
+M01012:51:000000000\-A4H0H:1:1101:13999:1617 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950fa::552c261b9eb6363a487b62c9"}     91
+M01012:51:000000000\-A4H0H:1:1101:14577:1618 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950fb::552c261b9eb6363a487b62c9"}    103
+M01012:51:000000000\-A4H0H:1:1101:16257:1622 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950fc::552c261b9eb6363a487b62c9"}    197
+M01012:51:000000000\-A4H0H:1:1101:16266:1647 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950fd::552c261b9eb6363a487b62c9"}    194
+M01012:51:000000000\-A4H0H:1:1101:16222:1647 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950fe::552c261b9eb6363a487b62c9"}    194
+M01012:51:000000000\-A4H0H:1:1101:15672:1648 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950ff::552c261b9eb6363a487b62c9"}     43
+M01012:51:000000000\-A4H0H:1:1101:16537:1664 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c95100::552c261b9eb6363a487b62c9"}     47
+M01012:51:000000000\-A4H0H:1:1101:16542:1690 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c95101::552c261b9eb6363a487b62c9"}    194
+dtype: int64
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Or we determine the error rate at each position
+"""
+error = sq\&.compare_to_reference(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq])\&.sum()/sq\&.seq_table\&.shape[0]
+iplot([go\&.Scatter(x = error\&.index, y = error, mode=\(aqmarkers\(aq)])
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Lets say you want to not count specific bases or residues as mismatches
+"""
+sq\&.compare_to_reference(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq], ignore_characters=[\(aqN\(aq])\&.sum()/sq\&.seq_table\&.shape[0]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+0      0.939333
+1      1.000000
+2      0.509667
+3      0.934000
+4      0.508000
+5      0.517333
+6      0.520667
+7      0.512667
+8      0.525667
+9      0.511000
+10     0.511333
+11     0.514000
+12     0.918333
+13     0.912667
+dtype: float64
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Lets say you are only interested in looking at sections/regions of a sequence
+"""
+sq\&.slice_sequences([3,10,20], name=\(aqsliced\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Determine the distribution of letters at each postion
+"""
+dist = sq\&.get_seq_dist()
+dist
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+have not made functions for drawing up sequence logos yet...but maybe just plot distribution at each position
+"""
+# lets put a dot at specific postions of interest
+mark_these_positions = [5, 10, 30]
+dist = dist/dist\&.sum()
+data = [
+    go\&.Bar(
+        x = dist\&.columns,
+        y = dist\&.loc[let],
+        name=let
+    )
+    for let in [\(aqA\(aq, \(aqC\(aq, \(aqG\(aq, \(aqT\(aq]
+]
+data\&.append(go\&.Scatter(x=mark_these_positions, y=[1.1]*len(mark_these_positions), mode=\(aqmarkers\(aq))
+fig = go\&.Figure(data=data, layout = go\&.Layout(barmode=\(aqstack\(aq, bargap=0.6,width=5000, ))
+iplot(fig)
+dist_div = np\&.exp((\-1*dist*np\&.log(dist))\&.sum())
+# also plot the "diversity"
+iplot([go\&.Scatter(x=dist\&.columns, y=dist_div,  mode=\(aqmarkers\(aq), go\&.Scatter(x=mark_these_positions, y=[4.1]*len(mark_these_positions), mode=\(aqmarkers\(aq)])
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Return a random subsample of sequences
+"""
+sq\&.subsample(10)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                                                                                                 seqs  M01012:51:000000000\-A4H0H:1:1101:4797:7093 1:N:...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:16060:5388 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:22232:5603 1:N...  GGAGGAGACGATGACTTCGGTCCCGCGGCCCCATGCGTCGATCCAA...
+
+                                                                                                quals
+M01012:51:000000000\-A4H0H:1:1101:4797:7093 1:N:...  AABBBBBBBBBBGGGGGGGGGGGGGEEGGEGGHHHHHGGGGGGGGG...
+M01012:51:000000000\-A4H0H:1:1101:16060:5388 1:N...  ABBBADBBBBABGGGGGGGGGGCEGFGGGGGGHHCHHGGGGGFCEE...
+M01012:51:000000000\-A4H0H:1:1101:22232:5603 1:N...  BBBBBB>AAA2AFGGGGGGGFFGHGGGGGGGGGHHHFGGEEGHGFH...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH JUMPING INTO THE SOURCE CODE FOR SEQTABLES
+.sp
+\fBWe can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position
+and accessing specific positions of an aligned sequence\fP
+.INDENT 0.0
+.TP
+.B seq_tables.read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=True, use_pandas=True)
+Load a fastq file as class SeqTable
+.UNINDENT
+.INDENT 0.0
+.TP
+.B seq_tables.read_sam(input_file, limit=None, chunk_size=100000, cleave_softclip=False, use_header_as_index=True)
+Load a SAM file into class SeqTable
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class seq_tables.seqtable(seqdata=None, qualitydata=None, start=1, index=None, seqtype=\(aqNT\(aq, phred_adjust=33, null_qual=\(aq!\(aq, **kwargs)
+Class for viewing aligned sequences within a list or dataframe. This will take a list of sequences and create views such that
+we can access each position within specific positions. It will also associate quality scores for each base if provided.
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBseqdata\fP (\fISeries, or list of strings\fP) \-\- List containing a set of sequences aligned to one another
+.IP \(bu 2
+\fBqualitydata\fP (\fISeries or list of quality scores, default=None\fP) \-\- If defined, then user is passing in quality data along with the sequences)
+.IP \(bu 2
+\fBstart\fP (\fI\%int\fP) \-\- Explicitly define where the aligned sequences start with respect to some refernce frame (i.e. start > 2 means sequences start at position 2 not 1)
+.IP \(bu 2
+\fBindex\fP (\fIlist of values defining the index, default=None\fP) \-\- 
+.IP \(bu 2
+\fBseqtype\fP (\fIstring of \(aqAA\(aq or \(aqNT\(aq, default=\(aqNT\(aq\fP) \-\- Defines the format of the data being passed into the dataframe
+.IP \(bu 2
+\fBphred_adjust\fP (\fIinteger, default=33\fP) \-\- If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B seq_df
+\fIDataframe\fP \-\- Each row in the dataframe is a sequence. It will always contain a \(aqseqs\(aq column representing the sequences past in. Optionally it will also contain a \(aqquals\(aq column representing quality scores
+.UNINDENT
+.INDENT 7.0
+.TP
+.B seq_table
+\fIDataframe\fP \-\- Dataframe representing sequences as characters in a table. Each row in the dataframe is a sequence. Each column represents the position of a base/residue within the sequence. The 4th position of sequence 2 is found as seq_table.ix[1, 4]
+.UNINDENT
+.INDENT 7.0
+.TP
+.B qual_table
+\fIDataframe, optional\fP \-\- Dataframe representing the quality score for each character in seq_table
+.UNINDENT
+Examples.sp
+.nf
+.ft C
+>>> sq = seq_tables.seqtable([\(aqAAA\(aq, \(aqACT\(aq, \(aqACA\(aq])
+>>> sq.hamming_distance(\(aqAAA\(aq)
+>>> sq = read_fastq(\(aqfastqfile.fq\(aq)
+.ft P
+.fi
+.INDENT 7.0
+.TP
+.B compare_to_reference(reference_seq, positions=None, ref_start=0, flip=False, set_diff=False, ignore_characters=[])
+Calculate which positions within a reference are not equal in all sequences in dataframe
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBreference_seq\fP (\fI\%string\fP) \-\- A string that you want to align sequences to
+.IP \(bu 2
+\fBpositions\fP (\fIlist, default=None\fP) \-\- specific positions in both the reference_seq and sequences you want to compare
+.IP \(bu 2
+\fBref_start\fP (\fIint, default=0\fP) \-\- where does the reference sequence start with respect to the aligned sequences
+.IP \(bu 2
+\fBflip\fP (\fI\%bool\fP) \-\- If True, then find bases that ARE MISMATCHES(NOT equal) to the reference
+.IP \(bu 2
+\fBset_diff\fP (\fI\%bool\fP) \-\- If True, then we want to analyze positions that ARE NOT listed in positions parameters
+.IP \(bu 2
+\fBignore_characters\fP (\fIchar or list of chars\fP) \-\- When performing distance/finding mismatches, always treat these characters as matches
+.UNINDENT
+.TP
+.B Returns
+Dataframe of boolean variables showing whether base is equal to reference at each position
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B convert_low_bases_to_null(q, replace_with=None, inplace=False)
+This will convert all letters whose corresponding quality is below a cutoff to the value replace_with
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBq\fP (\fI\%int\fP) \-\- quality score cutoff, convert all bases whose quality is < than q
+.IP \(bu 2
+\fBinplace\fP (\fIboolean\fP) \-\- If False, returns a copy of the object filtered by quality score
+.IP \(bu 2
+\fBreplace_with\fP (\fIchar\fP) \-\- a character to replace low bases with
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B get_quality_dist(bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None)
+Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBbins\fP (\fIlist of ints or tuples, default=None\fP) \-\- 
+.sp
+bins defines how to group together the columns/sequence positions when aggregating the statistics.
+.sp
+\fBNOTE:\fP
+.INDENT 2.0
+.INDENT 3.5
+bins=None
+.sp
+If bins is none, then by default, bins are set to the same ranges defined by fastqc report
+.UNINDENT
+.UNINDENT
+
+.IP \(bu 2
+\fBpercentiles\fP (\fIlist of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]\fP) \-\- value passed into pandas describe() function.
+.IP \(bu 2
+\fBexclude_null_quality\fP (\fIboolean, default=True\fP) \-\- do not include quality scores of 0 in the distribution
+.IP \(bu 2
+\fBsample\fP (\fIint, default=None\fP) \-\- If defined, then we will only calculate the distribution on a random subsampled population of sequences
+.UNINDENT
+.TP
+.B Returns
+\fBdata\fP \-\- contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
+graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards
+.TP
+.B Return type
+DataFrame
+.UNINDENT
+Examples
+.sp
+Show the median of the quality at the first ten positions in the sequence
+.sp
+.nf
+.ft C
+>>> table = SeqTable([\(aqAAAAAAAAAA\(aq, \(aqAAAAAAAAAC\(aq, \(aqCCCCCCCCCC\(aq], qualitydata=[\(aq6AA9\-C9\-\-6C\(aq, \(aq6AA!1C9BA6C\(aq, \(aq6AA!!C9!\-6C\(aq])
+>>> box_data, graphs = table.get_quality_dist(bins=range(10), percentiles=[0.5])
+.ft P
+.fi
+.sp
+Now repeat the example from above, except group together all values from the first 5 bases and the next 5 bases
+i.e.  All qualities between positions 0\-4 will be grouped together before performing median, and all qualities between 5\-9 will be grouped together). Also, return the bottom 10 and upper 90 percentiles in the statsitics
+.sp
+.nf
+.ft C
+>>> box_data, graphs = table.get_quality_dist(bins=[(0,4), (5,9)], percentiles=[0.1, 0.5, 0.9])
+.ft P
+.fi
+.sp
+We can also plot the results as a series of boxplots using plotly
+>>> from plotly.offline import init_notebook_mode, iplot, plot, iplot_mpl
+# assuming ipython..
+>>> init_notebook_mode()
+>>> plotly.iplot(graphs)
+# using outside of ipython
+>>> plotly.plot(graphs)
+.UNINDENT
+.INDENT 7.0
+.TP
+.B get_seq_dist(positions=None)
+Returns the distribution of bases or amino acids at each position.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B hamming_distance(reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[])
+Determine hamming distance of all sequences in dataframe to a reference sequence.
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBreference_seq\fP (\fI\%string\fP) \-\- A string that you want to align sequences to
+.IP \(bu 2
+\fBpositions\fP (\fIlist, default=None\fP) \-\- specific positions in both the reference_seq and sequences you want to compare
+.IP \(bu 2
+\fBref_start\fP (\fIint, default=0\fP) \-\- where does the reference sequence start with respect to the aligned sequences
+.IP \(bu 2
+\fBset_diff\fP (\fI\%bool\fP) \-\- If True, then we want to analyze positions that ARE NOT listed in positions parameters
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B qual_to_table(qualphred, phred_adjust=33, return_table=False)
+Given a set of quality score strings, updates the  return a new dataframe such that each column represents the quality at each position as a number
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBqualphred\fP \-\- (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)
+.IP \(bu 2
+\fBphred_adjust\fP (\fIinteger, default=33\fP) \-\- If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
+.IP \(bu 2
+\fBreturn_table\fP (\fIboolean, default=False\fP) \-\- If True, then the attribute self.qual_table is returned
+.UNINDENT
+.TP
+.B Returns
+\fBself.qual_table\fP \-\- each row corresponds to a specific sequence and each column corresponds to
+.TP
+.B Return type
+Dataframe
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B quality_filter(q, p, inplace=False, ignore_null_qual=True)
+Filter out sequences based on their average qualities at each base/position
+.INDENT 7.0
+.TP
+.B Parameters
+.INDENT 7.0
+.IP \(bu 2
+\fBq\fP (\fI\%int\fP) \-\- quality score cutoff
+.IP \(bu 2
+\fBp\fP (\fIint/float/percent 0\-100\fP) \-\- the percent of bases that must have a quality >= the cutoff q
+.IP \(bu 2
+\fBinplace\fP (\fIboolean\fP) \-\- If False, returns a copy of the object filtered by quality score
+.IP \(bu 2
+\fBignore_null_qual\fP (\fIboolean\fP) \-\- Ignore bases that are not represented. (i.e. those with quality of 0)
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B subsample(numseqs)
+Return a random sample of sequences as a new object
+.INDENT 7.0
+.TP
+.B Parameters
+\fBnumseqs\fP (\fI\%int\fP) \-\- How many sequences to sample
+.TP
+.B Returns
+SeqTable Object
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.TP
+.B table_to_seq(new_name)
+Return the sequence list
+.UNINDENT
+.INDENT 7.0
+.TP
+.B update_seqdf()
+Make seq_df attribute in sync with seq_table and qual_table
+Sometimes it might be useful to make changes to the seq_table attribute. For example, may you have your own custom code where you change the values of seq_table
+to be \(aq.\(aq or something random. Well you want to make sure that seq_df updates accordingly because the full length strings are the most useful in the end
+.UNINDENT
+.UNINDENT
+.SH SEQ_TABLES TUTORIAL
+.SS What does the class do:
+.sp
+Seq tables is to be used for viewing aligned sequences using pandas dataframes/numpy arrays. It will put lists or series of sequences and, optionally, quality scores into dataframes. Each sequence of tables in which each row is a specific sequence and each column is a specific position within the sequence. This allows useful slicing and determination of hamming distance between sequences
+.SS SOME WARNINGS BEFORE USING
+.INDENT 0.0
+.INDENT 3.5
+.INDENT 0.0
+.IP 1. 3
+Use python2 \- It does not appear to run as expected on python3, plan to fix that bug
+.IP 2. 3
+Use firefox \- Plotly is not currently displaying plots in ipython notebook on Chrome? Suggest using firefox for now
+.IP 3. 3
+Avoid converting each individual base/residue into a dataframe (i.e. dont do this => pd.DataFrame(sq.seq_table.view_bases())). In pandas, all stings even characters are treated as objects so the memory usage becomes extremely large (He told me that he will also deprecate being able to define cells as single characters. Instead, use pandas categories if desired but I find that categories are still kind\-of buggy.  For this reason, most of the variables in the class treat each string using their ascii values
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Jupyter/ipython notebook exmples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+import sys
+import seq_tables
+from plotly.offline import iplot, init_notebook_mode
+import numpy as np
+import pandas as pd
+from plotly import graph_objs as go
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+%load_ext autoreload
+%autoreload 2
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+init_notebook_mode()
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBThere are multiple ways to initialize this class. Essentially it just needs a list of aligned sequences to one another. If you would like to you could also past in a list of quality scores\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+seqs = [\(aqAAA\(aq, \(aqACT\(aq, \(aqACA\(aq]
+quals = [\(aqZCA\(aq, \(aqDGJ\(aq, \(aqJJJ\(aq]
+sq = seq_tables\&.seqtable(seqs, quals)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBThis class has three important attributes\fP
+.sp
+\fB1. sq.seq_df => returns a dataframe of the original sequence and/or quality\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.seq_df
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fB2. sq.seq_table => this represents all letters in the sequences as a table of rows/columns of ascii values\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.seq_table
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBIf you would like, you could view the letters as actual letters instead of ascii\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.view_bases()
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+array([[\(aqA\(aq, \(aqA\(aq, \(aqA\(aq],
+       [\(aqA\(aq, \(aqC\(aq, \(aqT\(aq],
+       [\(aqA\(aq, \(aqC\(aq, \(aqA\(aq]],
+      dtype=\(aq
+.nf
+|
+.fi
+S1\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# Now we can slice select positions
+sq\&.view_bases()[:, 1:3]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+array([[\(aqA\(aq, \(aqA\(aq],
+       [\(aqC\(aq, \(aqT\(aq],
+       [\(aqC\(aq, \(aqA\(aq]],
+      dtype=\(aq
+.nf
+|
+.fi
+S1\(aq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fB3. sq.qual_table => this represents the qualitysequence as actual quality bases\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.qual_table
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Now lets actualy load real data from a fastq file
+"""
+sq = seq_tables\&.read_fastq("test/Demo.fq")
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.view_bases()[:5,:]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+sq\&.seq_table\&.shape
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+(3000, 250)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+We can get a distribution of the quality scores in the data
+"""
+(dist, plotsmade) = sq\&.get_quality_dist()
+dist
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+The function get_quality_dist also returns plot objects that can be used by plotly
+"""
+iplot(plotsmade)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Filter out low quality sequences
+"""
+filtered = sq\&.quality_filter(q=20, p=50)
+filtered\&.seq_df\&.iloc[:5,:]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Convert any low quality bases to N
+"""
+converted = sq\&.convert_low_bases_to_null(q=20)
+converted\&.seq_df\&.iloc[:5,:]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Get the hamming distances of all sequences to the first sequence
+"""
+import time
+t1 = time\&.time()
+hamm = sq\&.hamming_distance(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq])
+t2 = time\&.time()
+t = t2\-t1
+print(\(aqTime: \(aq + str(t))
+hamm[:5]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+Time: 0.0169999599457
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f1::552c261b9eb6363a487b62c9"}      0
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f2::552c261b9eb6363a487b62c9"}    189
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f3::552c261b9eb6363a487b62c9"}    190
+M01012:51:000000000\-A4H0H:1:1101:14011:1558 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f4::552c261b9eb6363a487b62c9"}     43
+M01012:51:000000000\-A4H0H:1:1101:16697:1561 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f5::552c261b9eb6363a487b62c9"}    197
+dtype: int64
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Compare time and answer to distance module (pip install distance)
+"""
+import distance
+ref = sq\&.seq_df\&.iloc[0][\(aqseqs\(aq]
+t1 = time\&.time()
+hamm = sq\&.seq_df[\(aqseqs\(aq]\&.apply(lambda x: distance\&.hamming(x, ref))
+t2 =time\&.time()
+t = t2 \- t1
+print(\(aqTime: \(aq + str(t))
+hamm[:5]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+Time: 0.134000062943
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+M01012:51:000000000\-A4H0H:1:1101:15861:1495 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f1::552c261b9eb6363a487b62c9"}      0
+M01012:51:000000000\-A4H0H:1:1101:16832:1547 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f2::552c261b9eb6363a487b62c9"}    189
+M01012:51:000000000\-A4H0H:1:1101:14519:1548 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f3::552c261b9eb6363a487b62c9"}    190
+M01012:51:000000000\-A4H0H:1:1101:14011:1558 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f4::552c261b9eb6363a487b62c9"}     43
+M01012:51:000000000\-A4H0H:1:1101:16697:1561 1:N:0:10| <{"SEQ_ID": "552c2da19eb63635e1c950f5::552c261b9eb6363a487b62c9"}    197
+Name: seqs, dtype: int64
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Or we determine the error rate at each position
+"""
+error = sq\&.compare_to_reference(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq])\&.sum()/sq\&.seq_table\&.shape[0]
+iplot([go\&.Scatter(x = error\&.index, y = error, mode=\(aqmarkers\(aq)])
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Lets say you want to not count specific bases or residues as mismatches
+"""
+sq\&.compare_to_reference(sq\&.seq_df\&.iloc[0][\(aqseqs\(aq], ignore_characters=[\(aqN\(aq])\&.sum()/sq\&.seq_table\&.shape[0]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+0      0.939333
+1      1.000000
+2      0.509667
+3      0.934000
+4      0.508000
+5      0.517333
+6      0.520667
+7      0.512667
+8      0.525667
+9      0.511000
+10     0.511333
+11     0.514000
+12     0.918333
+13     0.912667
+14     0.916667
+15     0.515000
+16     0.509333
+17     0.511667
+18     0.505333
+19     0.516000
+20     0.507000
+21     0.524000
+22     0.515000
+23     0.519667
+24     0.920667
+25     0.515333
+26     0.514667
+27     0.924000
+28     0.519667
+29     0.925333
+         ...
+220    0.528667
+221    1.000000
+222    1.000000
+223    0.477333
+224    0.443333
+225    0.436333
+226    0.513000
+227    0.445000
+228    0.553000
+229    0.461667
+230    1.000000
+231    0.515000
+232    0.472333
+233    1.000000
+234    1.000000
+235    0.473667
+236    0.511667
+237    0.422667
+238    0.431333
+239    0.550667
+240    0.673333
+241    0.514000
+242    0.583333
+243    0.688667
+244    0.446667
+245    0.556333
+246    0.639667
+247    0.508000
+248    0.551667
+249    0.417000
+dtype: float64
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Lets say you are only interested in looking at sections/regions of a sequence
+"""
+sq\&.slice_sequences([3,10,20], name=\(aqsliced\(aq)\&.iloc[:5,:]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Determine the distribution of letters at each postion
+"""
+dist = sq\&.get_seq_dist()
+dist
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+have not made functions for drawing up sequence logos yet...but maybe just plot distribution at each position
+"""
+# lets put a dot at specific postions of interest
+mark_these_positions = [5, 10, 30]
+dist = dist/dist\&.sum()
+data = [
+    go\&.Bar(
+        x = dist\&.columns,
+        y = dist\&.loc[let],
+        name=let
+    )
+    for let in [\(aqA\(aq, \(aqC\(aq, \(aqG\(aq, \(aqT\(aq]
+]
+data\&.append(go\&.Scatter(x=mark_these_positions, y=[1.1]*len(mark_these_positions), mode=\(aqmarkers\(aq))
+fig = go\&.Figure(data=data, layout = go\&.Layout(barmode=\(aqstack\(aq, bargap=0.6,width=5000, ))
+iplot(fig)
+dist_div = np\&.exp((\-1*dist*np\&.log(dist))\&.sum())
+# also plot the "diversity"
+iplot([go\&.Scatter(x=dist\&.columns, y=dist_div,  mode=\(aqmarkers\(aq), go\&.Scatter(x=mark_these_positions, y=[4.1]*len(mark_these_positions), mode=\(aqmarkers\(aq)])
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"""
+Return a random subsample of sequences
+"""
+sq\&.subsample(10)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                                                                                                 seqs  M01012:51:000000000\-A4H0H:1:1101:16265:7976 1:N...  GGAGGAGACGATGACTTCGGTCCCGTGGCCCCATGCGTCGATAGTG...
+M01012:51:000000000\-A4H0H:1:1101:22564:5104 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:11818:7042 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:17400:7905 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:15162:3887 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:20952:5398 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:17496:2909 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:10049:3432 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+M01012:51:000000000\-A4H0H:1:1101:22050:6673 1:N...  GGAGGAGACGATGACTTCGGTCCCGTGGCCCCATGCGTCGATACAA...
+M01012:51:000000000\-A4H0H:1:1101:23976:6937 1:N...  GCCGTGACGTTGGACGAGTCCGGGGGCGGCCTCCAGACGCCCGGAG...
+
+                                                                                                quals
+M01012:51:000000000\-A4H0H:1:1101:16265:7976 1:N...  ABBBBAAABADAFDFGGFFGGGGHGHGGGGHEGGCHFGGGGGHGGG...
+M01012:51:000000000\-A4H0H:1:1101:22564:5104 1:N...  BCCCCCCCCCCCGGGGGGGGGGGGGGEGGGGGHHHHHGGGGGGCEE...
+M01012:51:000000000\-A4H0H:1:1101:11818:7042 1:N...  CCCCCDCCBBCCGGGGGGGGGGEEGGGGGGGGHHHHHGGGGGGGGF...
+M01012:51:000000000\-A4H0H:1:1101:17400:7905 1:N...  CCDDDDCCCCCDGGGGGGGGGGGGGGEGGGGGHHHHHGGGGGGGGG...
+M01012:51:000000000\-A4H0H:1:1101:15162:3887 1:N...  CCCCCCCCCBC@GFGGGGGGGGGGGGFGGGGGHHHHHGGGFGGGGG...
+M01012:51:000000000\-A4H0H:1:1101:20952:5398 1:N...  BBBBBBBBBBB@F4FGGGGGGGEGGGFGGFGGHHHHHGGGGGGCEE...
+M01012:51:000000000\-A4H0H:1:1101:17496:2909 1:N...  3>AAADAAB>>4GGGECGEGFGCGC0EG??EEFHFHHGGEEE//EE...
+M01012:51:000000000\-A4H0H:1:1101:10049:3432 1:N...  AA?AA1>AA>AAGBGGGCEGGGG0E//E/>>EHGHHFEE>EEGC>E...
+M01012:51:000000000\-A4H0H:1:1101:22050:6673 1:N...  BBBBBBAABBBAFGGGGGGGGGGHGHGGGHHGGHHHGGGGGGGGHH...
+M01012:51:000000000\-A4H0H:1:1101:23976:6937 1:N...  CCCCCDBBCCCDGGGGGGGGGGGGGGGGGGGGHHHHHGGFGGGGGF...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.IP \(bu 2
+genindex
+.IP \(bu 2
+modindex
+.IP \(bu 2
+search
+.UNINDENT
+.SH AUTHOR
+Constantine Chrysostomou
+.SH COPYRIGHT
+2016, Constantine Chrysostomou
+.\" Generated by docutils manpage writer.
+.

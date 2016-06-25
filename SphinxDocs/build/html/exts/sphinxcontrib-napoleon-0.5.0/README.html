@@ -1,0 +1,263 @@
+
+
+<!doctype html>
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Napoleon - Marching toward legible docstrings &mdash; Seq Table Documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.5',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="../../_static/bizstyle.js"></script>
+    <link rel="top" title="Seq Table Documentation" href="../../index.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Seq Table Documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Napoleon - <em>Marching toward legible docstrings</em></a><ul>
+<li><a class="reference internal" href="#getting-started">Getting Started</a></li>
+<li><a class="reference internal" href="#id1">Docstrings</a></li>
+<li><a class="reference internal" href="#docstring-sections">Docstring Sections</a></li>
+<li><a class="reference internal" href="#google-vs-numpy">Google vs NumPy</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/exts/sphinxcontrib-napoleon-0.5.0/README.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="napoleon-marching-toward-legible-docstrings">
+<h1>Napoleon - <em>Marching toward legible docstrings</em><a class="headerlink" href="#napoleon-marching-toward-legible-docstrings" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">As of Sphinx 1.3, the napoleon extension will come packaged with
+Sphinx under <cite>sphinx.ext.napoleon</cite>. The <cite>sphinxcontrib.napoleon</cite> extension
+will continue to work with Sphinx &lt;= 1.2.</p>
+</div>
+<p>Are you tired of writing docstrings that look like this:</p>
+<div class="highlight-default"><div class="highlight"><pre>:param path: The path of the file to wrap
+:type path: str
+:param field_storage: The :class:`FileStorage` instance to wrap
+:type field_storage: FileStorage
+:param temporary: Whether or not to delete the file when the File
+   instance is destructed
+:type temporary: bool
+:returns: A buffered writable file descriptor
+:rtype: BufferedFileStorage
+</pre></div>
+</div>
+<p><a class="reference external" href="http://docutils.sourceforge.net/rst.html">ReStructuredText</a> is great, but it creates visually dense, hard to read
+<a class="reference external" href="http://www.python.org/dev/peps/pep-0287/">docstrings</a>. Compare the jumble above to the same thing rewritten
+according to the <a class="reference external" href="http://google.github.io/styleguide/pyguide.html">Google Python Style Guide</a>:</p>
+<div class="highlight-default"><div class="highlight"><pre>Args:
+    path (str): The path of the file to wrap
+    field_storage (FileStorage): The :class:`FileStorage` instance to wrap
+    temporary (bool): Whether or not to delete the file when the File
+       instance is destructed
+
+Returns:
+    BufferedFileStorage: A buffered writable file descriptor
+</pre></div>
+</div>
+<p>Much more legible, no?</p>
+<p>Napoleon is a <a class="reference external" href="http://sphinx-doc.org/extensions.html">Sphinx extension</a> that enables Sphinx to parse both <a class="reference external" href="https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt">NumPy</a>
+and <a class="reference external" href="http://google.github.io/styleguide/pyguide.html#Comments">Google</a> style docstrings - the style recommended by <a class="reference external" href="https://sites.google.com/a/khanacademy.org/forge/for-developers/styleguide/python#TOC-Docstrings">Khan Academy</a>.</p>
+<p>Napoleon is a pre-processor that parses <a class="reference external" href="https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt">NumPy</a> and <a class="reference external" href="http://google.github.io/styleguide/pyguide.html#Comments">Google</a> style
+docstrings and converts them to reStructuredText before Sphinx attempts to
+parse them. This happens in an intermediate step while Sphinx is processing
+the documentation, so it doesn&#8217;t modify any of the docstrings in your actual
+source code files.</p>
+<div class="section" id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic">
+<li><p class="first">After <a class="reference external" href="http://sphinx-doc.org/tutorial.html">setting up Sphinx</a> to build your docs, enable napoleon in the
+Sphinx <cite>conf.py</cite> file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="c1"># conf.py</span>
+
+<span class="c1"># Add autodoc and napoleon to the extensions list</span>
+<span class="n">extensions</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;sphinx.ext.autodoc&#39;</span><span class="p">,</span> <span class="s1">&#39;sphinxcontrib.napoleon&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Use <cite>sphinx-apidoc</cite> to build your API documentation:</p>
+<div class="highlight-default"><div class="highlight"><pre>$ sphinx-apidoc -f -o docs/source projectdir
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="id1">
+<h2>Docstrings<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Napoleon interprets every docstring that <a class="reference external" href="http://sphinx-doc.org/ext/autodoc.html">Sphinx autodoc</a> can find,
+including docstrings on: <code class="docutils literal"><span class="pre">modules</span></code>, <code class="docutils literal"><span class="pre">classes</span></code>, <code class="docutils literal"><span class="pre">attributes</span></code>,
+<code class="docutils literal"><span class="pre">methods</span></code>, <code class="docutils literal"><span class="pre">functions</span></code>, and <code class="docutils literal"><span class="pre">variables</span></code>. Inside each docstring,
+specially formatted <a class="reference internal" href="#sections">Sections</a> are parsed and converted to
+reStructuredText.</p>
+<p>All standard reStructuredText formatting still works as expected.</p>
+</div>
+<div class="section" id="docstring-sections">
+<span id="sections"></span><h2>Docstring Sections<a class="headerlink" href="#docstring-sections" title="Permalink to this headline">¶</a></h2>
+<p>All of the following section headers are supported:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">Args</span></code> <em>(alias of Parameters)</em></li>
+<li><code class="docutils literal"><span class="pre">Arguments</span></code> <em>(alias of Parameters)</em></li>
+<li><code class="docutils literal"><span class="pre">Attributes</span></code></li>
+<li><code class="docutils literal"><span class="pre">Example</span></code></li>
+<li><code class="docutils literal"><span class="pre">Examples</span></code></li>
+<li><code class="docutils literal"><span class="pre">Keyword</span> <span class="pre">Args</span></code> <em>(alias of Keyword Arguments)</em></li>
+<li><code class="docutils literal"><span class="pre">Keyword</span> <span class="pre">Arguments</span></code></li>
+<li><code class="docutils literal"><span class="pre">Methods</span></code></li>
+<li><code class="docutils literal"><span class="pre">Note</span></code></li>
+<li><code class="docutils literal"><span class="pre">Notes</span></code></li>
+<li><code class="docutils literal"><span class="pre">Other</span> <span class="pre">Parameters</span></code></li>
+<li><code class="docutils literal"><span class="pre">Parameters</span></code></li>
+<li><code class="docutils literal"><span class="pre">Return</span></code> <em>(alias of Returns)</em></li>
+<li><code class="docutils literal"><span class="pre">Returns</span></code></li>
+<li><code class="docutils literal"><span class="pre">Raises</span></code></li>
+<li><code class="docutils literal"><span class="pre">References</span></code></li>
+<li><code class="docutils literal"><span class="pre">See</span> <span class="pre">Also</span></code></li>
+<li><code class="docutils literal"><span class="pre">Warning</span></code></li>
+<li><code class="docutils literal"><span class="pre">Warnings</span></code> <em>(alias of Warning)</em></li>
+<li><code class="docutils literal"><span class="pre">Warns</span></code></li>
+<li><code class="docutils literal"><span class="pre">Yield</span></code> <em>(alias of Yields)</em></li>
+<li><code class="docutils literal"><span class="pre">Yields</span></code></li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="google-vs-numpy">
+<h2>Google vs NumPy<a class="headerlink" href="#google-vs-numpy" title="Permalink to this headline">¶</a></h2>
+<p>Napoleon supports two styles of docstrings: <a class="reference external" href="http://google.github.io/styleguide/pyguide.html#Comments">Google</a> and <a class="reference external" href="https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt">NumPy</a>. The
+main difference between the two styles is that Google uses indention to
+separate sections, whereas NumPy uses underlines.</p>
+<p>Google style:</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Summary line.</span>
+
+<span class="sd">    Extended description of function.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        arg1 (int): Description of arg1</span>
+<span class="sd">        arg2 (str): Description of arg2</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: Description of return value</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>NumPy style:</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Summary line.</span>
+
+<span class="sd">    Extended description of function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    arg1 : int</span>
+<span class="sd">        Description of arg1</span>
+<span class="sd">    arg2 : str</span>
+<span class="sd">        Description of arg2</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bool</span>
+<span class="sd">        Description of return value</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>NumPy style tends to require more vertical space, whereas Google style
+tends to use more horizontal space. Google style tends to be easier to
+read for short and simple docstrings, whereas NumPy style tends be easier
+to read for long and in-depth docstrings.</p>
+<p>The <a class="reference external" href="https://sites.google.com/a/khanacademy.org/forge/for-developers/styleguide/python#TOC-Docstrings">Khan Academy</a> recommends using Google style.</p>
+<p>The choice between styles is largely aesthetic, but the two styles should
+not be mixed. Choose one style for your project and be consistent with it.</p>
+<p>For full documentation see <a class="reference external" href="http://sphinxcontrib-napoleon.readthedocs.org">http://sphinxcontrib-napoleon.readthedocs.org</a></p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Seq Table Documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2016, Constantine Chrysostomou.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4b1.
+    </div>
+  </body>
+</html>
