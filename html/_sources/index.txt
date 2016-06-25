@@ -1,14 +1,19 @@
 Documenation for the starting repository of seqtable
 ====================================================
 
+Tutorial:
+
+See the `Tutorial Page`_ for a quickstart introduction in how to use the class
+
+
+
 Contents:
 
 .. toctree::
    :maxdepth: 1
 
-   jupyternotebooktutorial.rst
-   
    to_the_code.rst
+
 
 
 Indices and tables
@@ -17,4 +22,7 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. _Tutorial Page: _static/seqtables_tutorial.html
+
 
