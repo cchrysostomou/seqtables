@@ -8,12 +8,6 @@ import warnings
 import pandas as pd
 import math
 import numpy as np
-try:
-    from plotly import graph_objs as go
-    plotly_installed = True
-except:
-    plotly_installed = False
-    warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
 
 try:
     from Bio import SeqIO
@@ -21,75 +15,9 @@ try:
 except:
     bio_installed = False
 
-from collections import defaultdict
-
-
-degen_to_base = {
-    'GT': 'K',
-    'AC': 'M',
-    'ACG': 'V',
-    'CGT': 'B',
-    'AG': 'R',
-    'AGT': 'D',
-    'A': 'A',
-    'CG': 'S',
-    'AT': 'W',
-    'T': 'T',
-    'C': 'C',
-    'G': 'G',
-    'ACGT': 'N',
-    'ACT': 'H',
-    'CT': 'Y'
-}
-
-dna_alphabet = list('ACTG') + sorted(list(set(sorted(degen_to_base.values())) - set('ACTG'))) + ['-.']
-aa_alphabet = list('ACDEFGHIKLMNPQRSTVWYX*Z-.')
-
-amino_acid_color_properties = defaultdict(lambda:
-    {
-        "color": "#f1f2f1", "name": "Unknown"
-    },
-    {
-        'R': {"color": "#1FAABD", "name": "Arginine", "short": "Ala", "charge": 1, "hydropathy": -4.5},
-        'H': {"color": "#1FAABD", "name": "Histidine", "short": "His", "charge": 1, "hydropathy": -3.2},
-        'K': {"color": "#1FAABD", "name": "Lysine", "short": "Lys", "charge": 1, "hydropathy": -3.9},
-
-        'D': {"color": "#D75032", "name": "Aspartic acid", "short": "Asp", "charge": -1, "hydropathy": -3.5},
-        'E': {"color": "#D75032", "name": "Glutamic acid", "short": "Glu", "charge": -1, "hydropathy": -3.5},
-
-        'C': {"color": "#64AD59", "name": "Cysteine", "short": "Cys", "charge": 0, "hydropathy": 2.5},
-        'S': {"color": "#64AD59", "name": "Serine", "short": "Ser", "charge": 0, "hydropathy": -0.8},
-        'G': {"color": "#64AD59", "name": "Glycine", "short": "Cys", "charge": 0, "hydropathy": -0.4},
-        'Y': {"color": "#64AD59", "name": "Tyrosine", "short": "Tyr", "charge": 0, "hydropathy": -0.8},
-        'T': {"color": "#64AD59", "name": "Threonine", "short": "Thr", "charge": 0, "hydropathy": -0.7},
-
-
-        'P': {"color": "#4B3E4D", "name": "Proline", "short": "Pro", "charge": 0, "hydropathy": -1.6},
-        'F': {"color": "#4B3E4D", "name": "Phenylalanine", "short": "Phe", "charge": 0, "hydropathy": 2.8},
-        'V': {"color": "#4B3E4D", "name": "Valine", "short": "Val", "charge": 0, "hydropathy": 4.2},
-        'L': {"color": "#4B3E4D", "name": "Leucine", "short": "Leu", "charge": 0, "hydropathy": 3.8},
-        'I': {"color": "#4B3E4D", "name": "Isoleucine", "short": "Ili", "charge": 0, "hydropathy": 4.5},
-        'A': {"color": "#4B3E4D", "name": "Alanine", "short": "Ala", "charge": 0, "hydropathy": 1.8},
-
-        'M': {"color": "#E57E25", "name": "Methionine", "short": "Met", "charge": 0, "hydropathy": 1.9},
-        'W': {"color": "#E57E25", "name": "Tryptophan", "short": "Trp", "charge": 0, "hydropathy": -0.9},
-
-        'N': {"color": "#92278F", "name": "Asparagine", "short": "Asn", "charge": 0, "hydropathy": -3.5},
-        'Q': {"color": "#92278F", "name": "Glutamine", "short": "Pro", "charge": 0, "hydropathy": -3.5},
-
-        'X': {"color": "#f1f2f1", "name": "Unknown", "short": "X", "charge": 0, "hydropathy": 0},
-        '*': {"color": "#f1f2f1", "name": "Unknown", "short": "X", "charge": 0, "hydropathy": 0}
-    }
-)
-
-dna_colors = defaultdict(lambda: {"color": "#f1f2f1", "name": "Unknown"}, {
-    'A': {"color": "#1FAABD", "name": "Adenine", "short": "A"},
-    'T': {"color": "#D75032", "name": "Thymine", "short": "T"},
-    'G': {"color": "#4B3E4D", "name": "Guanine", "short": "G"},
-    'C': {"color": "#64AD59", "name": "Cytosine", "short": "C"},
-    'X': {"color": "#f1f2f1", "name": "Unknown", "short": "X"},
-    'N': {"color": "#f1f2f1", "name": "Unknown", "short": "X"}
-})
+# from collections import defaultdict
+from seq_logo import draw_seqlogo_barplots
+from seq_table_util import get_quality_dist  # , degen_to_base, dna_alphabet, aa_alphabet
 
 
 def strseries_to_bytearray(series, fillvalue):
@@ -97,374 +25,6 @@ def strseries_to_bytearray(series, fillvalue):
     series = series.apply(lambda x: x.ljust(max_len, fillvalue))
     seq_as_int = np.array(list(series), dtype='S').view('S1').reshape((series.size, -1)).view('uint8')
     return (series, seq_as_int)
-
-
-def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_properties=True, additional_text = {}, show_consensus=True, scale_by_distance=False, title='', annotation_font_size=14, yaxistitle='', bargap=None, plotwidth=None, plotheight=500, num_y_ticks = 3):
-    """
-    Uses plotly to generate a sequence logo as a series of bar graphs. This method of sequence logo is taken from the following source:
-
-        Repository: https://github.com/ISA-tools/SequenceLogoVis
-
-        Paper: E. Maguire, P. Rocca-Serra, S.-A. Sansone, and M. Chen, Redesigning the sequence logo with glyph-based approaches to aid interpretation, In Proceedings of EuroVis 2014, Short Paper (2014)
-
-
-    Args:
-        seq_dist (Dataframe):
-            Rows should be unique letters, Columns should be a specific position within the sequence,
-
-            Values should be the values that represent the frequency OR bits of a specific letter at a specific position
-
-        alphabet (string): AA or NT
-
-        label_cutoff (int, default=0.09):
-            Defines a cutoff for when to stop adding 'text' labels to the plot (i.e. dont add labels for low freq letters)
-
-        use_properties (bool, default=True):
-            If True and if the alphabet is AA then it will color AA by their properties
-
-        additional_text (list of tuples):
-            For each tuple, element 0 is string/label, element 1 is string of letters at each position.
-
-            i.e. additional_text = [('text', 'AACCA'), ('MORE', 'ATTTT')]. This is meant to add extra
-
-            layers of information for the sequence. For example may you would like to include the WT sequence at the bottom
-
-        show_consensus (bool):
-            If True will show the consensus sequence at the bottom of the graph
-
-        scale_by_distance (bool):
-            If True, then each x-coordinate of the bar graph will be equal to the column position in the dataframe.
-
-            For example if you are showing a motif in residues 10, 50, and 90 then the xcoordinates of the bars wil be 10, 50, 90 rather than 1,2,3
-
-        annotation_font_size (int):
-            size of text font
-
-        yaxistitle (string):
-            how to label the  y axis
-
-        bargap (float, default=None):
-            bargap parameter for plots. If None, then lets plotly handle it
-
-        plotwidth (float, default=None):
-            defines the total width of the plot and individual bars
-
-        num_y_ticks (int):
-            How many ytick labels should appear in plot
-
-    Returns:
-        fig (plotly.graph_objs.Figure):
-            plot object for plotting in plotly
-
-    Examples:
-        >>> from seq_tables import draw_seqlogo_barplots
-        >>> import pandas as pd
-        >>> from plotly.offline import iplot, init_notebook_mode
-        >>> init_notebook_mode()
-        >>> distribution = pd.DataFrame({1: [0.9, 0.1, 0 ,0], 2: [0.5, 0.2, 0.1, 0.2], 3: [0, 0, 0, 1], 4: [0.25, 0.25, 0.25, 0.25]}, index=['A', 'C', 'T', 'G'])
-        >>> plotdata = draw_seqlogo_barplots(distribution)
-        >>> iplot(plotdata)
-
-
-    """
-    warnings.warn('Currently only frequency logos are used, will allow for entropy in future')
-    seq_dist = seq_dist.copy()
-    if plotly_installed is False:
-        warnings.warn('Cannot generate seq logo plots. Please install plotly')
-        return None
-    data = []
-    if alphabet is None:
-        letters = list(seq_dist.index)
-        alphabet = 'nt' if len(set(letters) - set(['A', 'C', 'T', 'G', 'N', 'S'])) > 0 else 'aa'
-
-    annotation = []
-
-    if alphabet.lower() == 'nt':
-        colors = {c1: dna_colors[c1]['color'] for c1 in list(dna_colors.keys()) + list(seq_dist.index)}
-    elif alphabet.lower() == 'aa':
-        if use_properties is True:
-            colors = {c1: amino_acid_color_properties[c1]['color'] for c1 in list(amino_acid_color_properties.keys()) + list(seq_dist.index)}
-
-    labels = seq_dist.columns
-    if scale_by_distance is False:
-        seq_dist = seq_dist.rename(columns={r: i + 1 for i, r in enumerate(seq_dist.columns)})
-        max_dist = seq_dist.shape[1] + 1
-    else:
-        start = min(seq_dist.columns)
-        seq_dist = seq_dist.rename(columns={r: r - start + 1 for i, r in enumerate(seq_dist.columns)})
-        max_dist = max(seq_dist.columns) + 1
-
-    if plotwidth is None:
-        plotwidth = max(400, ((350 / 6.0) * seq_dist.shape[1]))
-
-    cnt = 0
-    for i in seq_dist.columns:
-        top = 0
-        l = False if cnt > 0 else True
-        for name, val in seq_dist.loc[:, i].sort_values().iteritems():
-            top += val
-            data.append(
-                go.Bar(
-                    y=[val],
-                    x=[i],
-                    name=name,
-                    marker=dict(
-                        color=colors[name],
-                        line=dict(
-                            color='white',
-                            width=1.50
-                        )
-                    ),
-                    legendgroup=name,
-                    showlegend=l
-                ),
-            )
-            if val > label_cutoff:
-                annotation.append(
-                    dict(
-                        x=i,
-                        y=top,
-                        align='center',
-                        xanchor='center',
-                        yanchor='top',
-                        text=name,
-                        font=dict(color='white', size=annotation_font_size),
-                        showarrow=False
-                    )
-                )
-        cnt += 1
-    consensus_seq = seq_dist.idxmax()
-    consensus_seq = dict(consensus_seq)
-    starting_y = -0.1 if show_consensus else 0.0
-    for pos, xc in enumerate(seq_dist.columns):
-        if show_consensus:
-            annotation.append(
-                dict(
-                    x=xc,
-                    y=-0.1,
-                    align='center',
-                    xanchor='center',
-                    yanchor='top',
-                    text=consensus_seq[xc],
-                    font=dict(color=colors[consensus_seq[xc]], size=annotation_font_size),
-                    showarrow=False
-                )
-            )
-
-        for numk, rows in enumerate(additional_text):
-            key = rows[0]
-            textval = rows[1]
-            if pos < len(textval):
-                annotation.append(
-                    dict(
-                        x=xc,
-                        y=-0.1 * (numk + 1) + starting_y,
-                        align='center',
-                        xanchor='center',
-                        yanchor='top',
-                        text=textval[pos],
-                        font=dict(color=colors[textval[pos]], size=annotation_font_size) if textval[pos] in colors else dict(color='black', size=annotation_font_size),
-                        showarrow=False
-                    )
-                )
-
-    if show_consensus:
-        annotation.append(
-            dict(
-                x=-0.1,
-                y=-0.1,
-                align='center',
-                xanchor='right',
-                yanchor='top',
-                text='Consensus',
-                font=dict(color='black', size=14),
-                showarrow=False)
-        )
-
-    for numk, rows in enumerate(additional_text):
-        annotation.append(
-            dict(
-                x=-0.1,
-                y=-0.1 * (numk + 1) + starting_y,
-                align='center',
-                xanchor='right',
-                yanchor='top',
-                text=rows[0],
-                font=dict(color='black', size=12),
-                showarrow=False
-            )
-        )
-
-    num_y_ticks = max(3, num_y_ticks)
-    miny = 0  # math.floor(seq_dist.min().min())
-    maxy = math.ceil(seq_dist.max().max())
-    tick_steps = ((maxy * 1.0) - 0) / (num_y_ticks - 1)
-    tmp = miny
-    tick_vals = []
-    while tmp <= maxy:
-        tick_vals.append(round(tmp, 2))
-        tmp += tick_steps
-
-    layout = go.Layout(
-        barmode='stack',
-        annotations=annotation,
-        yaxis=dict(showgrid=False, rangemode='nonnegative', tickvals=tick_vals, zeroline=False, showline=True, title=yaxistitle, ),
-        xaxis=dict(showgrid=False, rangemode='nonnegative', side='top', showline=False, zeroline=False, ticktext=labels, tickvals=seq_dist.columns),
-        # xaxis2=dict(overlaying='x', side='bottom', tickvals = seq_dist.columns, ticktext = consensus_seq),
-        legend=dict(traceorder='reversed'),
-        width=plotwidth,
-        title=title,
-        height=plotheight
-        # margin={'l': 90}
-    )
-
-    if bargap is not None:
-        layout['bargap'] = bargap
-    fig = go.Figure(data=data, layout=layout)
-    return fig, data, layout
-
-
-def get_quality_dist(qual_df, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None):
-    """
-        Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.
-
-        Args:
-            bins(list of ints or tuples, default=None): bins defines how to group together the columns/sequence positions when aggregating the statistics.
-
-                .. note:: bins=None
-
-                    If bins is none, then by default, bins are set to the same ranges defined by fastqc report
-
-            percentiles (list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]): value passed into pandas describe() function.
-            exclude_null_quality (boolean, default=True): do not include quality scores of 0 in the distribution
-            sample (int, default=None): If defined, then we will only calculate the distribution on a random subsampled population of sequences
-
-        Returns:
-            data (DataFrame): contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
-            graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards
-
-        Examples:
-            Show the median of the quality at the first ten positions in the sequence
-
-            >>> table = SeqTable(['AAAAAAAAAA', 'AAAAAAAAAC', 'CCCCCCCCCC'], qualitydata=['6AA9-C9--6C', '6AA!1C9BA6C', '6AA!!C9!-6C'])
-            >>> box_data, graphs = table.get_quality_dist(bins=range(10), percentiles=[0.5])
-
-            Now repeat the example from above, except group together all values from the first 5 bases and the next 5 bases
-            i.e.  All qualities between positions 0-4 will be grouped together before performing median, and all qualities between 5-9 will be grouped together). Also, return the bottom 10 and upper 90 percentiles in the statsitics
-
-            >>> box_data, graphs = table.get_quality_dist(bins=[(0,4), (5,9)], percentiles=[0.1, 0.5, 0.9])
-
-            We can also plot the results as a series of boxplots using plotly
-            >>> from plotly.offline import init_notebook_mode, iplot, plot, iplot_mpl
-            # assuming ipython..
-            >>> init_notebook_mode()
-            >>> plotly.iplot(graphs)
-            # using outside of ipython
-            >>> plotly.plot(graphs)
-    """
-    from collections import OrderedDict
-    if bins is None:
-        # use default bins as defined by fastqc report
-        bins = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9,
-            (10, 14), (15, 19), (20, 24), (25, 29), (30, 34), (35, 39), (40, 44), (45, 49), (50, 54), (55, 59), (60, 64),
-            (65, 69), (70, 74), (80, 84), (85, 89), (90, 94), (95, 99),
-            (100, 104), (105, 109), (110, 114), (115, 119), (120, 124), (125, 129), (130, 134), (135, 139), (140, 144), (145, 149), (150, 154), (155, 159), (160, 164), (165, 169), (170, 174), (175, 179), (180, 184), (185, 189), (190, 194), (195, 199),
-            (200, 204), (205, 209), (210, 214), (215, 219), (220, 224), (225, 229), (230, 234), (235, 239), (240, 244), (245, 249), (250, 254), (255, 259), (260, 264), (265, 269), (270, 274), (275, 279), (280, 284), (285, 289), (290, 294), (295, 299),
-            300
-        ]
-        bins = [x if isinstance(x, int) else (x[0], x[1]) for x in bins]
-    else:
-        # just in case its a generator (i.e. range function)
-        bins = [x for x in bins]
-
-    binnames = OrderedDict()
-    for b in bins:
-        if isinstance(b, int):
-            binnames[str(b)] = (b, b)
-        elif len(b) == 2:
-            binnames[str(b[0]) + '-' + str(b[1])] = (b[0], b[1])
-
-    def get_binned_cols(column):
-        # use this function to group together columns
-        for n, v in binnames.items():
-            if column >= v[0] and column <= v[1]:
-                return n
-
-    temp = qual_df.replace(0, np.nan) if exclude_null_quality else self.qual_table
-    if sample:
-        temp = temp.sample(sample)
-
-    def agg_fxn(group, per):
-        # use this function to aggregate quality scores and create distributions/boxplots
-        col = group.columns
-        name = str(col[0]) if len(col) == 1 else str(col[0]) + '-' + str(col[-1])
-        per = [round(p, 2) for p in per]
-        to_add_manually = set([0.10, 0.25, 0.50, 0.75, 0.90]) - set(per)
-        program_added_values = {f: str(int(f * 100)) + '%' for f in to_add_manually}
-        per = per + list(to_add_manually)
-        g = group.stack().describe(percentiles=per)
-        # Now create a small fake distribution for making box plots. This is preferred over just storing all millions of datapoint
-        l = 100
-        # man this is ugly, gotta clean this up some hwow
-        storevals = [g.loc['min'], g.loc['10%'], g.loc['25%'], g.loc['50%'], g.loc['75%'], g.loc['90%'], g.loc['max']]
-        if g.loc['50%'] < 20:
-            color = 'red'
-        elif g.loc['50%'] < 30:
-            color = 'blue'
-        else:
-            color = 'green'
-        subsets = [int(x) for x in np.arange(0, 1, 0.05) * l]
-        sample_data = np.zeros(l)
-        sample_data[0:subsets[1]] = storevals[1]
-        sample_data[subsets[1]:subsets[3]] = storevals[1]
-        sample_data[subsets[3]:subsets[7]] = storevals[2]
-        sample_data[subsets[7]:subsets[13]] = storevals[3]
-        sample_data[subsets[13]:subsets[17]] = storevals[4]
-        sample_data[subsets[17]:subsets[19]] = storevals[5]
-        sample_data[subsets[19]:] = storevals[5]
-        median = g.loc['50%']
-        # now only store the values the user wanted
-        g = g.drop(program_added_values.values())
-        if plotly_installed:
-            plotdata = go.Box(
-                y=sample_data,
-                pointpos=0,
-                name=name,
-                boxpoints=False,
-                fillcolor=color,
-                showlegend=False,
-                line={
-                    'color': 'black',
-                    'width': 0.7
-                },
-                marker=dict(
-                    color='rgb(107, 174, 214)',
-                    size=3
-                )
-            )
-        else:
-            plotdata = None
-
-        return (g, plotdata, median)
-
-    # group results using the aggregation function defined above
-    grouped_data = temp.groupby(get_binned_cols, axis=1).apply(lambda groups: agg_fxn(groups, percentiles))
-
-    labels = [b for b in binnames.keys() if b in grouped_data.keys()]
-    data = pd.DataFrame(grouped_data.apply(lambda x: x[0])).transpose()[labels]
-
-    if plotly_installed is True:
-        graphs = list(grouped_data.apply(lambda x: x[1]).transpose()[labels])
-        # median_vals = list(grouped_data.apply(lambda x: x[2]).transpose()[labels])
-        scatter_min = go.Scatter(x=data.columns, y=data.loc['min'], mode='markers', name='min', showlegend=False)
-        # scatter_median = go.Scatter(x=data.columns, y=median_vals, mode='line', name='median', line=dict(shape='spline')
-        scatter_mean = go.Scatter(x=data.columns, y=data.loc['mean'], mode='line', name='mean', line=dict(shape='spline'))
-        graphs.extend([scatter_min, scatter_mean])
-    else:
-        graphs = None
-
-    return data, graphs
 
 
 class seqtable():
@@ -675,7 +235,6 @@ class seqtable():
 
                         Setting return_num_bases to true will change how results are returned (two elements rather than one are returned)
 
-
             Returns:
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
@@ -700,7 +259,7 @@ class seqtable():
 
         # convert reference to numbers
         # reference_array = np.array(bytearray(reference_seq))[ref_cols]
-        reference_array, compare_column_header = self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)
+        reference_array, compare_column_header = self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, positions, return_as_np=True)
 
         if set_diff is True:
             # change positions of interest to be the SET DIFFERENCE of positions parameter
@@ -776,7 +335,7 @@ class seqtable():
                 profile (pd.Series): Returns the counts (or frequency) for each mutation observed (i.e. A->C or A->T)
         """
         # def reference sequence
-        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'}).transpose()
+        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True, positions=positions)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'}).transpose()
         # compare all bases/residues to the reference seq (returns a dataframe of boolean vars)
         not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
         # now create a numpy array in which the reference is repeated N times where n = # sequences
@@ -841,7 +400,7 @@ class seqtable():
 
         return ts_freq / tv_freq, ts_freq, tv_freq
 
-    def mutation_profile_deprecated(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized =False):
+    def mutation_profile_deprecated(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized=False):
         """
             Return the type of mutation rates observed between the reference sequence and sequences in table.
 
@@ -865,7 +424,7 @@ class seqtable():
                 This function has been deprecated because we found a better speed-optimized method
         """
         # def reference sequence
-        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'})
+        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)[0], index=self.seq_table.columns, positions=positions).rename(columns={0: 'Ref base'})
         # compare all bases/residues to the reference seq (returns a dataframe of boolean vars)
         not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
         subset = self.seq_table[not_equal_to.columns]
@@ -929,7 +488,7 @@ class seqtable():
         if inplace is False:
             return meself
 
-    def adjust_ref_seq(self, ref, table_columns, ref_start, return_as_np=True):
+    def adjust_ref_seq(self, ref, table_columns, ref_start, positions, return_as_np=True):
             """
             Aligns a reference sequence such that its position matches positions within the seqtable of interest
 
@@ -950,7 +509,7 @@ class seqtable():
                 # found in reference sequence provided
                 if positions is None:
                     positions = compare_column_header
-                ignore_postions = compare_column_header[ref_start]
+                # ignore_postions = compare_column_header[ref_start]
                 before_filter = positions
                 positions = [p for p in positions if p >= ref_start]
                 if len(positions) < len(before_filter):
@@ -963,7 +522,6 @@ class seqtable():
                 reference_seq = reference_seq + self.fillna_val * (self.seq_table.shape[1] - len(reference_seq))
 
             return np.array([reference_seq], dtype='S').view(np.uint8) if return_as_np is True else reference_seq, compare_column_header
-
 
     def slice_sequences(self, positions, name='seqs', return_quality=False, empty_chars=None):
         if empty_chars is None:
