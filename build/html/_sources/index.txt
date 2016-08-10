@@ -1,15 +1,18 @@
-.. seqtables documentation master file, created by
-   sphinx-quickstart on Tue May 10 22:52:01 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Documenation for the starting repository of seqtable
+====================================================
 
-Welcome to seqtables's documentation!
-=====================================
+Tutorial:
+
+See the `Tutorial Page`_ for a quickstart introduction in how to use the class
+
+
 
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+
+   to_the_code.rst
 
 
 
@@ -19,4 +22,7 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. _Tutorial Page: _static/seqtables_tutorial.html
+
 
