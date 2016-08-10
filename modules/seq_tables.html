@@ -1,0 +1,654 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>seq_tables &mdash; Seq Table Documentation</title>
+    
+    <link rel="stylesheet" href="../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.5',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="Seq Table Documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Seq Table Documentation</a> &raquo;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for seq_tables</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">**We can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position</span>
+<span class="sd">and accessing specific positions of an aligned sequence**</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">plotly</span> <span class="kn">import</span> <span class="n">graph_objs</span> <span class="k">as</span> <span class="n">go</span>
+<span class="kn">from</span> <span class="nn">Bio</span> <span class="kn">import</span> <span class="n">SeqIO</span>
+<span class="kn">import</span> <span class="nn">gc</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="n">degen_to_base</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;GT&#39;</span><span class="p">:</span> <span class="s1">&#39;K&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;AC&#39;</span><span class="p">:</span> <span class="s1">&#39;M&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;ACG&#39;</span><span class="p">:</span> <span class="s1">&#39;V&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;CGT&#39;</span><span class="p">:</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;AG&#39;</span><span class="p">:</span> <span class="s1">&#39;R&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;AGT&#39;</span><span class="p">:</span> <span class="s1">&#39;D&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="s1">&#39;A&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;CG&#39;</span><span class="p">:</span> <span class="s1">&#39;S&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;AT&#39;</span><span class="p">:</span> <span class="s1">&#39;W&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;T&#39;</span><span class="p">:</span> <span class="s1">&#39;T&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;C&#39;</span><span class="p">:</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;G&#39;</span><span class="p">:</span> <span class="s1">&#39;G&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;ACGT&#39;</span><span class="p">:</span> <span class="s1">&#39;N&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;ACT&#39;</span><span class="p">:</span> <span class="s1">&#39;H&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;CT&#39;</span><span class="p">:</span> <span class="s1">&#39;Y&#39;</span>
+<span class="p">}</span>
+
+<span class="n">dna_alphabet</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="s1">&#39;ACTG&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">degen_to_base</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="s1">&#39;ACTG&#39;</span><span class="p">))</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;-.&#39;</span><span class="p">]</span>
+<span class="n">aa_alphabet</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="s1">&#39;ACDEFGHIKLMNPQRSTVWYX*Z-.&#39;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">strseries_to_bytearray</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">fillvalue</span><span class="p">):</span>
+    <span class="n">max_len</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="nb">len</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">series</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">max_len</span><span class="p">,</span> <span class="n">fillvalue</span><span class="p">))</span>
+    <span class="n">seq_as_int</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">series</span><span class="p">))</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s1">&#39;S1&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">series</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+    <span class="c1">#seq_as_int = seq_as_char</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">seq_as_int</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="seqtable"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable">[docs]</a><span class="k">class</span> <span class="nc">seqtable</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class for viewing aligned sequences within a list or dataframe. This will take a list of sequences and create views such that</span>
+<span class="sd">    we can access each position within specific positions. It will also associate quality scores for each base if provided.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        seqdata (Series, or list of strings): List containing a set of sequences aligned to one another</span>
+<span class="sd">        qualitydata (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)</span>
+<span class="sd">        start (int): Explicitly define where the aligned sequences start with respect to some refernce frame (i.e. start &gt; 2 means sequences start at position 2 not 1)</span>
+<span class="sd">        index (list of values defining the index, default=None):</span>
+
+<span class="sd">            .. note::Index=None</span>
+<span class="sd">                </span>
+<span class="sd">                If None, then the index will result in default integer indexing by pandas.</span>
+
+<span class="sd">        seqtype (string of &#39;AA&#39; or &#39;NT&#39;, default=&#39;NT&#39;): Defines the format of the data being passed into the dataframe</span>
+<span class="sd">        phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)</span>
+<span class="sd">    </span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        seq_df (Dataframe): Each row in the dataframe is a sequence. It will always contain a &#39;seqs&#39; column representing the sequences past in. Optionally it will also contain a &#39;quals&#39; column representing quality scores</span>
+<span class="sd">        seq_table (Dataframe): Dataframe representing sequences as characters in a table. Each row in the dataframe is a sequence. Each column represents the position of a base/residue within the sequence. The 4th position of sequence 2 is found as seq_table.ix[1, 4]</span>
+<span class="sd">        qual_table (Dataframe, optional): Dataframe representing the quality score for each character in seq_table</span>
+<span class="sd">    </span>
+<span class="sd">    Examples: </span>
+<span class="sd">        &gt;&gt;&gt; sq = seq_tables.seqtable([&#39;AAA&#39;, &#39;ACT&#39;, &#39;ACA&#39;])</span>
+<span class="sd">        &gt;&gt;&gt; sq.hamming_distance(&#39;AAA&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; sq = read_fastq(&#39;fastqfile.fq&#39;)</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seqdata</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">qualitydata</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">seqtype</span><span class="o">=</span><span class="s1">&#39;NT&#39;</span><span class="p">,</span> <span class="n">phred_adjust</span><span class="o">=</span><span class="mi">33</span><span class="p">,</span> <span class="n">null_qual</span><span class="o">=</span><span class="s1">&#39;!&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">null_qual</span> <span class="o">=</span> <span class="n">null_qual</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">start</span>
+        <span class="k">if</span> <span class="n">seqtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;AA&#39;</span><span class="p">,</span> <span class="s1">&#39;NT&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;You defined seqtype as, {0}. We only allow seqtype to be &quot;AA&quot; or &quot;NT&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">seqtype</span><span class="p">))</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">seqtype</span> <span class="o">=</span> <span class="n">seqtype</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phred_adjust</span> <span class="o">=</span> <span class="n">phred_adjust</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">fillna_val</span> <span class="o">=</span> <span class="s1">&#39;N&#39;</span> <span class="k">if</span> <span class="n">seqtype</span> <span class="o">==</span> <span class="s1">&#39;NT&#39;</span> <span class="k">else</span> <span class="s1">&#39;X&#39;</span>
+        
+        <span class="k">if</span> <span class="n">seqdata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">index</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_seq_to_table</span><span class="p">(</span><span class="n">seqdata</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="o">=</span> <span class="bp">None</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">qualitydata</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span> <span class="ow">and</span> <span class="n">qualitydata</span><span class="o">.</span><span class="n">empty</span> <span class="ow">is</span> <span class="bp">False</span><span class="p">)</span> <span class="ow">or</span> <span class="n">qualitydata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">qual_to_table</span><span class="p">(</span><span class="n">qualitydata</span><span class="p">,</span> <span class="n">phred_adjust</span><span class="p">,</span> <span class="n">return_table</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_list</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">pass</span>
+        <span class="c1"># stable = self.seq_table.__getitem__(key)</span>
+        <span class="c1"># if self.qual_table:</span>
+        <span class="c1">#     qtable = self.qual_table.__getitem__(key)</span>
+        <span class="c1"># else:</span>
+        <span class="c1">#     qtable = None</span>
+        <span class="c1"># return SeqTable(None, copy_constructor={&#39;seqs&#39;: stable, &#39;quals&#39;: qtable, &#39;seqtype&#39;: self.seqtype, &#39;phred_adjust&#39;: self.phred_adjust, &#39;memory_safe&#39;: self.memory_safe, &#39;alphabet&#39;: self.alphabet})</span>
+
+    <span class="k">def</span> <span class="nf">loc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">pass</span>
+        <span class="c1"># stable = self.seq_table.loc(key)</span>
+        <span class="c1"># if self.qual_table:</span>
+        <span class="c1">#     qtable = self.qual_table.__getitem__(key)</span>
+        <span class="c1"># else:</span>
+        <span class="c1">#     qtable = None</span>
+        <span class="c1"># return SeqTable(None, copy_constructor={&#39;seqs&#39;: stable, &#39;quals&#39;: qtable, &#39;seqtype&#39;: self.seqtype, &#39;phred_adjust&#39;: self.phred_adjust, &#39;memory_safe&#39;: self.memory_safe, &#39;alphabet&#39;: self.alphabet})</span>
+
+    <span class="k">def</span> <span class="nf">view_bases</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">as_dataframe</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s1">&#39;S1&#39;</span><span class="p">)</span>
+        <span class="c1">#return self.seq_table.values.view(&#39;S1&#39;) if as_dataframe is False else pd.DataFrame(list(list(self.seq_table.values.view(&#39;S1&#39;))), dtype=&#39;category&#39;, )</span>
+
+<span class="c1">#    def update(self):</span>
+<span class="c1">#        pass</span>
+
+<span class="c1">#    def append(self, seqlist, quallist=None, index=None):</span>
+        <span class="c1"># if isinstance(seqlist, list):</span>
+        <span class="c1">#     seqlist = pd.Series(seqlist)</span>
+        <span class="c1"># # if self.qual_table is None:</span>
+        <span class="c1"># #     self.seq_table = seqlist</span>
+        <span class="c1"># # self.seq_table = pd.concat([self.seq_table, seqlist])</span>
+        <span class="c1"># # if quallist:</span>
+        <span class="c1"># #     self.qual_table = pd.concat([self.qual_table])</span>
+        <span class="c1"># pass</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_df</span><span class="o">.</span><span class="n">__repr__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">__str__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+<div class="viewcode-block" id="seqtable.subsample"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.subsample">[docs]</a>    <span class="k">def</span> <span class="nf">subsample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">numseqs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Return a random sample of sequences as a new object</span>
+<span class="sd">            </span>
+<span class="sd">            Args:</span>
+<span class="sd">                numseqs (int): How many sequences to sample</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                SeqTable Object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">random_sequences</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_df</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">numseqs</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="s1">&#39;quals&#39;</span> <span class="ow">in</span> <span class="n">random_sequences</span><span class="p">:</span>
+            <span class="n">random_qualities</span> <span class="o">=</span> <span class="n">random_sequences</span><span class="p">[</span><span class="s1">&#39;quals&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">random_qualities</span> <span class="o">=</span> <span class="bp">None</span>        
+        <span class="k">return</span> <span class="n">seqtable</span><span class="p">(</span><span class="n">random_sequences</span><span class="p">[</span><span class="s1">&#39;seqs&#39;</span><span class="p">],</span> <span class="n">random_qualities</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">random_sequences</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">seqtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seqtype</span><span class="p">,</span><span class="n">phred_adjust</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phred_adjust</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="seqtable.update_seqdf"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.update_seqdf">[docs]</a>    <span class="k">def</span> <span class="nf">update_seqdf</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Make seq_df attribute in sync with seq_table and qual_table</span>
+<span class="sd">            Sometimes it might be useful to make changes to the seq_table attribute. For example, may you have your own custom code where you change the values of seq_table</span>
+<span class="sd">            to be &#39;.&#39; or something random. Well you want to make sure that seq_df updates accordingly because the full length strings are the most useful in the end</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seq_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slice_sequences</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="seqtable.qual_to_table"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.qual_to_table">[docs]</a>    <span class="k">def</span> <span class="nf">qual_to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qualphred</span><span class="p">,</span> <span class="n">phred_adjust</span><span class="o">=</span><span class="mi">33</span><span class="p">,</span> <span class="n">return_table</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Given a set of quality score strings, updates the  return a new dataframe such that each column represents the quality at each position as a number</span>
+<span class="sd">            </span>
+<span class="sd">            Args:</span>
+<span class="sd">                qualphred: (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)</span>
+<span class="sd">                phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)</span>
+<span class="sd">                return_table (boolean, default=False): If True, then the attribute self.qual_table is returned</span>
+<span class="sd">            </span>
+<span class="sd">            Returns:</span>
+<span class="sd">                self.qual_table (Dataframe): each row corresponds to a specific sequence and each column corresponds to</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">qualphred</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">qual_list</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">qualphred</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">qual_list</span> <span class="o">=</span> <span class="n">qualphred</span>
+        <span class="p">(</span><span class="n">qual_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="p">)</span> <span class="o">=</span> <span class="n">strseries_to_bytearray</span><span class="p">(</span><span class="n">qual_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">null_qual</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">seq_df</span><span class="p">[</span><span class="s1">&#39;quals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">qual_list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phred_adjust</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">))</span>
+            
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;The provided quality list does not match the format of the sequence list. Shape of sequences {0}, shape of quality {1}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_seq_to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seqlist</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Given a set of sequences, generates a dataframe such that each column represents a base or residue at each position of the aligned sequences</span>
+
+<span class="sd">            .. important::Private function</span>
+
+<span class="sd">                This function is not for public use</span>
+<span class="sd">        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seqlist</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">seq_list</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">seqlist</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">seq_list</span> <span class="o">=</span> <span class="n">seqlist</span>
+            
+        <span class="p">(</span><span class="n">seq_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">)</span> <span class="o">=</span> <span class="n">strseries_to_bytearray</span><span class="p">(</span><span class="n">seq_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fillna_val</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seq_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">seq_list</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;seqs&#39;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">))</span>
+            
+
+<div class="viewcode-block" id="seqtable.table_to_seq"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.table_to_seq">[docs]</a>    <span class="k">def</span> <span class="nf">table_to_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Return the sequence list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_list</span></div>
+
+
+<div class="viewcode-block" id="seqtable.compare_to_reference"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.compare_to_reference">[docs]</a>    <span class="k">def</span> <span class="nf">compare_to_reference</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reference_seq</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">ref_start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">flip</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">set_diff</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">ignore_characters</span><span class="o">=</span><span class="p">[]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Calculate which positions within a reference are not equal in all sequences in dataframe</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                reference_seq (string): A string that you want to align sequences to</span>
+<span class="sd">                positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare</span>
+<span class="sd">                ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences</span>
+<span class="sd">                flip (bool): If True, then find bases that ARE MISMATCHES(NOT equal) to the reference</span>
+<span class="sd">                set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters</span>
+<span class="sd">                ignore_characters (char or list of chars): When performing distance/finding mismatches, always treat these characters as matches</span>
+<span class="sd">            Returns:</span>
+<span class="sd">                Dataframe of boolean variables showing whether base is equal to reference at each position</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">compare_column_header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">columns</span>
+        <span class="k">if</span> <span class="n">ref_start</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># simple: the reference sequence is too long, so just trim it</span>
+            <span class="n">reference_seq</span><span class="p">[(</span><span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">ref_start</span><span class="p">):]</span>
+        <span class="k">elif</span> <span class="n">ref_start</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">reference_seq</span> <span class="o">=</span> <span class="s1">&#39;N&#39;</span> <span class="o">*</span> <span class="n">ref_start</span> <span class="o">+</span> <span class="n">reference_seq</span>
+            <span class="c1"># more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not</span>
+            <span class="c1"># found in reference sequence provided</span>
+            <span class="k">if</span> <span class="n">positions</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">positions</span> <span class="o">=</span> <span class="n">compare_column_header</span>
+            <span class="n">ignore_postions</span> <span class="o">=</span> <span class="n">compare_column_header</span><span class="p">[</span><span class="n">ref_start</span><span class="p">]</span>
+            <span class="n">before_filter</span> <span class="o">=</span> <span class="n">positions</span>
+            <span class="n">positions</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">positions</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&gt;=</span> <span class="n">ref_start</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">before_filter</span><span class="p">):</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">_</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">before_filter</span><span class="p">[:</span><span class="n">ref_start</span><span class="p">]])))</span>
+            <span class="n">compare_column_header</span> <span class="o">=</span> <span class="n">compare_column_header</span><span class="p">[</span><span class="n">ref_start</span><span class="p">:]</span>
+        
+        <span class="c1"># adjust reference length</span>
+        <span class="n">reference_seq</span> <span class="o">=</span> <span class="n">reference_seq</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">set_diff</span> <span class="ow">is</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="c1"># change positions of interest to be the SET DIFFERENCE of positions parameter</span>
+            <span class="k">if</span> <span class="n">positions</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;You cannot analyze the setdifferene of all positions. Returns a non-informative answer (no columns to compare)&#39;</span><span class="p">)</span>
+            <span class="n">positions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">compare_column_header</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">positions</span><span class="p">))</span>
+        
+        <span class="c1"># determine which columns we should look at</span>
+        <span class="k">if</span> <span class="n">positions</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">ref_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">compare_column_header</span><span class="p">))]</span>
+            <span class="n">positions</span> <span class="o">=</span> <span class="n">compare_column_header</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ref_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">compare_column_header</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">positions</span><span class="p">]</span>
+        
+        <span class="c1"># convert reference to numbers</span>
+        <span class="n">reference_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">bytearray</span><span class="p">(</span><span class="n">reference_seq</span><span class="p">))[</span><span class="n">ref_cols</span><span class="p">]</span>
+        
+        <span class="c1"># actually perform the hamming distance</span>
+        <span class="n">diffs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">[</span><span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">==</span> <span class="n">reference_array</span> <span class="k">if</span> <span class="n">flip</span> <span class="ow">is</span> <span class="bp">False</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">[</span><span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">!=</span> <span class="n">reference_array</span>
+        
+        <span class="k">if</span> <span class="n">ignore_characters</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ignore_characters</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="n">ignore_characters</span> <span class="o">=</span> <span class="p">[</span><span class="n">ignore_characters</span><span class="p">]</span>
+            <span class="n">ignore_characters</span> <span class="o">=</span> <span class="p">[</span><span class="nb">ord</span><span class="p">(</span><span class="n">let</span><span class="p">)</span> <span class="k">for</span> <span class="n">let</span> <span class="ow">in</span> <span class="n">ignore_characters</span><span class="p">]</span>
+            <span class="c1"># now we have to ignore characters that are equal to specific values</span>
+            <span class="n">ignore_pos</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">[</span><span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">==</span> <span class="n">ignore_characters</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">|</span> <span class="p">(</span><span class="n">reference_array</span> <span class="o">==</span> <span class="n">ignore_characters</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">chr_p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ignore_characters</span><span class="p">)):</span>
+                <span class="n">ignore_pos</span> <span class="o">=</span> <span class="n">ignore_pos</span> <span class="o">|</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="p">[</span><span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">==</span> <span class="n">ignore_characters</span><span class="p">[</span><span class="n">chr_p</span><span class="p">])</span> <span class="o">|</span> <span class="p">(</span><span class="n">reference_array</span> <span class="o">==</span> <span class="n">ignore_characters</span><span class="p">[</span><span class="n">chr_p</span><span class="p">])</span>
+            <span class="c1"># now adjust boolean results to ignore any positions == ignore_characters</span>
+            <span class="n">diffs</span> <span class="o">=</span> <span class="n">diffs</span> <span class="o">|</span> <span class="n">ignore_pos</span> <span class="k">if</span> <span class="n">flip</span> <span class="ow">is</span> <span class="bp">False</span> <span class="k">else</span> <span class="n">diffs</span> <span class="o">&amp;</span> <span class="n">ignore_pos</span>
+        
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">diffs</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="seqtable.hamming_distance"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.hamming_distance">[docs]</a>    <span class="k">def</span> <span class="nf">hamming_distance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reference_seq</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">ref_start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">set_diff</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">ignore_characters</span><span class="o">=</span><span class="p">[]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Determine hamming distance of all sequences in dataframe to a reference sequence.</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                reference_seq (string): A string that you want to align sequences to</span>
+<span class="sd">                positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare</span>
+<span class="sd">                ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences</span>
+<span class="sd">                set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">diffs</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">compare_to_reference</span><span class="p">(</span><span class="n">reference_seq</span><span class="p">,</span> <span class="n">positions</span><span class="p">,</span> <span class="n">ref_start</span><span class="p">,</span> <span class="n">flip</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">set_diff</span><span class="o">=</span><span class="n">set_diff</span><span class="p">,</span> <span class="n">ignore_characters</span><span class="o">=</span><span class="n">ignore_characters</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">diffs</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="seqtable.quality_filter"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.quality_filter">[docs]</a>    <span class="k">def</span> <span class="nf">quality_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">ignore_null_qual</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Filter out sequences based on their average qualities at each base/position</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                q (int): quality score cutoff</span>
+<span class="sd">                p (int/float/percent 0-100): the percent of bases that must have a quality &gt;= the cutoff q</span>
+<span class="sd">                inplace (boolean): If False, returns a copy of the object filtered by quality score</span>
+<span class="sd">                ignore_null_qual (boolean): Ignore bases that are not represented. (i.e. those with quality of 0)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;You have not passed in any quality data for these sequences&quot;</span><span class="p">)</span>
+
+        <span class="n">meself</span> <span class="o">=</span> <span class="bp">self</span> <span class="k">if</span> <span class="n">inplace</span> <span class="ow">is</span> <span class="bp">True</span> <span class="k">else</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">total_bases</span> <span class="o">=</span> <span class="p">(</span><span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">values</span> <span class="o">&gt;</span> <span class="p">(</span><span class="nb">ord</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">null_qual</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">phred_adjust</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">ignore_null_qual</span> <span class="k">else</span> <span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">percent_above</span> <span class="o">=</span> <span class="p">(</span><span class="mi">100</span> <span class="o">*</span> <span class="p">((</span><span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">values</span> <span class="o">&gt;=</span> <span class="n">q</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span> <span class="o">/</span> <span class="n">total_bases</span>
+
+        <span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span> <span class="o">=</span> <span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="p">[</span><span class="n">percent_above</span> <span class="o">&gt;=</span> <span class="n">p</span><span class="p">]</span>
+        <span class="n">meself</span><span class="o">.</span><span class="n">seq_table</span> <span class="o">=</span> <span class="n">meself</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">meself</span><span class="o">.</span><span class="n">seq_df</span> <span class="o">=</span> <span class="n">meself</span><span class="o">.</span><span class="n">seq_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">bases</span> <span class="o">=</span> <span class="n">meself</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">if</span> <span class="n">inplace</span> <span class="ow">is</span> <span class="bp">False</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">meself</span></div>
+
+
+<div class="viewcode-block" id="seqtable.convert_low_bases_to_null"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.convert_low_bases_to_null">[docs]</a>    <span class="k">def</span> <span class="nf">convert_low_bases_to_null</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">replace_with</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This will convert all letters whose corresponding quality is below a cutoff to the value replace_with</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                q (int): quality score cutoff, convert all bases whose quality is &lt; than q</span>
+<span class="sd">                inplace (boolean): If False, returns a copy of the object filtered by quality score</span>
+<span class="sd">                replace_with (char): a character to replace low bases with</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;You have not passed in any quality data for these sequences&quot;</span><span class="p">)</span>
+
+        <span class="n">meself</span> <span class="o">=</span> <span class="bp">self</span> <span class="k">if</span> <span class="n">inplace</span> <span class="ow">is</span> <span class="bp">True</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">replace_with</span> <span class="o">=</span> <span class="nb">ord</span><span class="p">(</span><span class="n">replace_with</span><span class="p">)</span> <span class="k">if</span> <span class="n">replace_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;N&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">seqtype</span> <span class="o">==</span> <span class="s1">&#39;NT&#39;</span> <span class="k">else</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;X&#39;</span><span class="p">)</span>
+        <span class="n">meself</span><span class="o">.</span><span class="n">seq_table</span><span class="p">[</span><span class="n">meself</span><span class="o">.</span><span class="n">qual_table</span> <span class="o">&lt;</span> <span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="n">replace_with</span>
+        <span class="n">chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">meself</span><span class="o">.</span><span class="n">seq_df</span><span class="p">[</span><span class="s1">&#39;seqs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">meself</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s1">&#39;S&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">chars</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">inplace</span> <span class="ow">is</span> <span class="bp">False</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">meself</span></div>
+
+
+    <span class="k">def</span> <span class="nf">slice_sequences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">positions</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;seqs&#39;</span><span class="p">,</span> <span class="n">return_quality</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">positions</span> <span class="o">==</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="n">return_quality</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;seqs&#39;</span><span class="p">,</span> <span class="s1">&#39;quals&#39;</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;seqs&#39;</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="n">num_chars</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions</span><span class="p">)</span>
+        <span class="n">substring</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">name</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s1">&#39;S{0}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_chars</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">()},</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">return_quality</span><span class="p">:</span>
+            <span class="n">subquality</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">positions</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+            <span class="n">subquality</span> <span class="o">=</span> <span class="p">(</span><span class="n">subquality</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">phred_adjust</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s1">&#39;S{0}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_chars</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+            <span class="n">substring</span><span class="p">[</span><span class="s1">&#39;quals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">subquality</span>
+        <span class="k">return</span> <span class="n">substring</span>
+
+
+<div class="viewcode-block" id="seqtable.get_seq_dist"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.get_seq_dist">[docs]</a>    <span class="k">def</span> <span class="nf">get_seq_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns the distribution of bases or amino acids at each position.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">compare</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">positions</span><span class="p">]</span> <span class="k">if</span> <span class="n">positions</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_table</span>
+        <span class="n">dist</span> <span class="o">=</span> <span class="n">compare</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">value_counts</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">rename</span><span class="p">({</span><span class="n">c</span><span class="p">:</span> <span class="nb">chr</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">index</span><span class="p">)},</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dist</span></div>
+
+
+    <span class="k">def</span> <span class="nf">seq_logo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+            
+
+<div class="viewcode-block" id="seqtable.get_quality_dist"><a class="viewcode-back" href="../to_the_code.html#seq_tables.seqtable.get_quality_dist">[docs]</a>    <span class="k">def</span> <span class="nf">get_quality_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">percentiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">],</span> <span class="n">exclude_null_quality</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">sample</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                bins(list of ints or tuples, default=None): bins defines how to group together the columns/sequence positions when aggregating the statistics.</span>
+
+<span class="sd">                    .. note:: bins=None</span>
+
+<span class="sd">                        If bins is none, then by default, bins are set to the same ranges defined by fastqc report</span>
+
+<span class="sd">                percentiles (list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]): value passed into pandas describe() function.</span>
+<span class="sd">                exclude_null_quality (boolean, default=True): do not include quality scores of 0 in the distribution</span>
+<span class="sd">                sample (int, default=None): If defined, then we will only calculate the distribution on a random subsampled population of sequences</span>
+<span class="sd">            </span>
+<span class="sd">            Returns:</span>
+<span class="sd">                data (DataFrame): contains the distribution information at every bin (min value, max value, desired precentages and quartiles)</span>
+<span class="sd">                graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards</span>
+
+<span class="sd">            Examples:</span>
+<span class="sd">                Show the median of the quality at the first ten positions in the sequence</span>
+
+<span class="sd">                &gt;&gt;&gt; table = SeqTable([&#39;AAAAAAAAAA&#39;, &#39;AAAAAAAAAC&#39;, &#39;CCCCCCCCCC&#39;], qualitydata=[&#39;6AA9-C9--6C&#39;, &#39;6AA!1C9BA6C&#39;, &#39;6AA!!C9!-6C&#39;])</span>
+<span class="sd">                &gt;&gt;&gt; box_data, graphs = table.get_quality_dist(bins=range(10), percentiles=[0.5])</span>
+
+<span class="sd">                Now repeat the example from above, except group together all values from the first 5 bases and the next 5 bases</span>
+<span class="sd">                i.e.  All qualities between positions 0-4 will be grouped together before performing median, and all qualities between 5-9 will be grouped together). Also, return the bottom 10 and upper 90 percentiles in the statsitics</span>
+
+<span class="sd">                &gt;&gt;&gt; box_data, graphs = table.get_quality_dist(bins=[(0,4), (5,9)], percentiles=[0.1, 0.5, 0.9])</span>
+
+<span class="sd">                We can also plot the results as a series of boxplots using plotly</span>
+<span class="sd">                &gt;&gt;&gt; from plotly.offline import init_notebook_mode, iplot, plot, iplot_mpl</span>
+<span class="sd">                # assuming ipython..</span>
+<span class="sd">                &gt;&gt;&gt; init_notebook_mode()</span>
+<span class="sd">                &gt;&gt;&gt; plotly.iplot(graphs)</span>
+<span class="sd">                # using outside of ipython</span>
+<span class="sd">                &gt;&gt;&gt; plotly.plot(graphs)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+        <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c1"># use default bins as defined by fastqc report</span>
+            <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span>
+                <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">19</span><span class="p">),</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="p">(</span><span class="mi">25</span><span class="p">,</span> <span class="mi">29</span><span class="p">),</span> <span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="mi">34</span><span class="p">),</span> <span class="p">(</span><span class="mi">35</span><span class="p">,</span> <span class="mi">39</span><span class="p">),</span> <span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">44</span><span class="p">),</span> <span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">49</span><span class="p">),</span> <span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">54</span><span class="p">),</span> <span class="p">(</span><span class="mi">55</span><span class="p">,</span> <span class="mi">59</span><span class="p">),</span> <span class="p">(</span><span class="mi">60</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">65</span><span class="p">,</span> <span class="mi">69</span><span class="p">),</span> <span class="p">(</span><span class="mi">70</span><span class="p">,</span> <span class="mi">74</span><span class="p">),</span> <span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">84</span><span class="p">),</span> <span class="p">(</span><span class="mi">85</span><span class="p">,</span> <span class="mi">89</span><span class="p">),</span> <span class="p">(</span><span class="mi">90</span><span class="p">,</span> <span class="mi">94</span><span class="p">),</span> <span class="p">(</span><span class="mi">95</span><span class="p">,</span> <span class="mi">99</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">104</span><span class="p">),</span> <span class="p">(</span><span class="mi">105</span><span class="p">,</span> <span class="mi">109</span><span class="p">),</span> <span class="p">(</span><span class="mi">110</span><span class="p">,</span> <span class="mi">114</span><span class="p">),</span> <span class="p">(</span><span class="mi">115</span><span class="p">,</span> <span class="mi">119</span><span class="p">),</span> <span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="mi">124</span><span class="p">),</span> <span class="p">(</span><span class="mi">125</span><span class="p">,</span> <span class="mi">129</span><span class="p">),</span> <span class="p">(</span><span class="mi">130</span><span class="p">,</span> <span class="mi">134</span><span class="p">),</span> <span class="p">(</span><span class="mi">135</span><span class="p">,</span> <span class="mi">139</span><span class="p">),</span> <span class="p">(</span><span class="mi">140</span><span class="p">,</span> <span class="mi">144</span><span class="p">),</span> <span class="p">(</span><span class="mi">145</span><span class="p">,</span> <span class="mi">149</span><span class="p">),</span> <span class="p">(</span><span class="mi">150</span><span class="p">,</span> <span class="mi">154</span><span class="p">),</span> <span class="p">(</span><span class="mi">155</span><span class="p">,</span> <span class="mi">159</span><span class="p">),</span> <span class="p">(</span><span class="mi">160</span><span class="p">,</span> <span class="mi">164</span><span class="p">),</span> <span class="p">(</span><span class="mi">165</span><span class="p">,</span> <span class="mi">169</span><span class="p">),</span> <span class="p">(</span><span class="mi">170</span><span class="p">,</span> <span class="mi">174</span><span class="p">),</span> <span class="p">(</span><span class="mi">175</span><span class="p">,</span> <span class="mi">179</span><span class="p">),</span> <span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="mi">184</span><span class="p">),</span> <span class="p">(</span><span class="mi">185</span><span class="p">,</span> <span class="mi">189</span><span class="p">),</span> <span class="p">(</span><span class="mi">190</span><span class="p">,</span> <span class="mi">194</span><span class="p">),</span> <span class="p">(</span><span class="mi">195</span><span class="p">,</span> <span class="mi">199</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">204</span><span class="p">),</span> <span class="p">(</span><span class="mi">205</span><span class="p">,</span> <span class="mi">209</span><span class="p">),</span> <span class="p">(</span><span class="mi">210</span><span class="p">,</span> <span class="mi">214</span><span class="p">),</span> <span class="p">(</span><span class="mi">215</span><span class="p">,</span> <span class="mi">219</span><span class="p">),</span> <span class="p">(</span><span class="mi">220</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="p">(</span><span class="mi">225</span><span class="p">,</span> <span class="mi">229</span><span class="p">),</span> <span class="p">(</span><span class="mi">230</span><span class="p">,</span> <span class="mi">234</span><span class="p">),</span> <span class="p">(</span><span class="mi">235</span><span class="p">,</span> <span class="mi">239</span><span class="p">),</span> <span class="p">(</span><span class="mi">240</span><span class="p">,</span> <span class="mi">244</span><span class="p">),</span> <span class="p">(</span><span class="mi">245</span><span class="p">,</span> <span class="mi">249</span><span class="p">),</span> <span class="p">(</span><span class="mi">250</span><span class="p">,</span> <span class="mi">254</span><span class="p">),</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">259</span><span class="p">),</span> <span class="p">(</span><span class="mi">260</span><span class="p">,</span> <span class="mi">264</span><span class="p">),</span> <span class="p">(</span><span class="mi">265</span><span class="p">,</span> <span class="mi">269</span><span class="p">),</span> <span class="p">(</span><span class="mi">270</span><span class="p">,</span> <span class="mi">274</span><span class="p">),</span> <span class="p">(</span><span class="mi">275</span><span class="p">,</span> <span class="mi">279</span><span class="p">),</span> <span class="p">(</span><span class="mi">280</span><span class="p">,</span> <span class="mi">284</span><span class="p">),</span> <span class="p">(</span><span class="mi">285</span><span class="p">,</span> <span class="mi">289</span><span class="p">),</span> <span class="p">(</span><span class="mi">290</span><span class="p">,</span> <span class="mi">294</span><span class="p">),</span> <span class="p">(</span><span class="mi">295</span><span class="p">,</span> <span class="mi">299</span><span class="p">),</span>
+                <span class="mi">300</span>
+            <span class="p">]</span>
+            <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span>  <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># just in case its a generator (i.e. range function)</span>
+            <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+
+        <span class="n">binnames</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">binnames</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">binnames</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;-&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">def</span> <span class="nf">get_binned_cols</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>
+            <span class="c1"># use this function to group together columns</span>
+            <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">binnames</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="o">&gt;=</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">column</span> <span class="o">&lt;=</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="k">return</span> <span class="n">n</span>
+
+        <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span> <span class="k">if</span> <span class="n">exclude_null_quality</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">qual_table</span>
+        <span class="k">if</span> <span class="n">sample</span><span class="p">:</span>
+            <span class="n">temp</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">agg_fxn</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">per</span><span class="p">):</span>
+            <span class="c1"># use this function to aggregate quality scores and create distributions/boxplots</span>
+            <span class="n">col</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">columns</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">col</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;-&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">per</span> <span class="o">=</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">per</span><span class="p">]</span>
+            <span class="n">to_add_manually</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.90</span><span class="p">])</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">per</span><span class="p">)</span>
+            <span class="n">program_added_values</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">f</span> <span class="o">*</span> <span class="mi">100</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39;%&#39;</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">to_add_manually</span><span class="p">}</span>
+            <span class="n">per</span> <span class="o">=</span> <span class="n">per</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">to_add_manually</span><span class="p">)</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">stack</span><span class="p">()</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">percentiles</span><span class="o">=</span><span class="n">per</span><span class="p">)</span>
+            <span class="c1"># Now create a small fake distribution for making box plots. This is preferred over just storing all millions of datapoint</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="mi">100</span>
+            <span class="c1"># man this is ugly, gotta clean this up some hwow</span>
+            <span class="n">storevals</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;min&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;10%&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;25%&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;50%&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;75%&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;90%&#39;</span><span class="p">],</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;max&#39;</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;50%&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">20</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;red&#39;</span>
+            <span class="k">elif</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;50%&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">30</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;blue&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;green&#39;</span>
+            <span class="n">subsets</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span> <span class="o">*</span> <span class="n">l</span><span class="p">]</span>
+            <span class="n">sample_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">3</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">3</span><span class="p">]:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">7</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">7</span><span class="p">]:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">13</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">13</span><span class="p">]:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">17</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">17</span><span class="p">]:</span><span class="n">subsets</span><span class="p">[</span><span class="mi">19</span><span class="p">]]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+            <span class="n">sample_data</span><span class="p">[</span><span class="n">subsets</span><span class="p">[</span><span class="mi">19</span><span class="p">]:]</span> <span class="o">=</span> <span class="n">storevals</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+            <span class="n">median</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;50%&#39;</span><span class="p">]</span>
+            <span class="c1"># now only store the values the user wanted</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">program_added_values</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">go</span><span class="o">.</span><span class="n">Box</span><span class="p">(</span>
+                    <span class="n">y</span><span class="o">=</span><span class="n">sample_data</span><span class="p">,</span>
+                    <span class="n">pointpos</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">boxpoints</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+                    <span class="n">fillcolor</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
+                    <span class="n">showlegend</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+                    <span class="n">line</span><span class="o">=</span><span class="p">{</span>
+                        <span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;black&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="mf">0.7</span>
+                    <span class="p">},</span>
+                    <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                        <span class="n">color</span><span class="o">=</span><span class="s1">&#39;rgb(107, 174, 214)&#39;</span><span class="p">,</span>
+                        <span class="n">size</span><span class="o">=</span><span class="mi">3</span>
+                    <span class="p">),</span>
+                    <span class="p">),</span> <span class="n">median</span>
+                    <span class="p">)</span>
+
+        <span class="c1"># group results using the aggregation function defined above</span>
+        <span class="n">grouped_data</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">get_binned_cols</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">groups</span><span class="p">:</span> <span class="n">agg_fxn</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">percentiles</span><span class="p">))</span>
+        
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">binnames</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">grouped_data</span><span class="o">.</span><span class="n">keys</span><span class="p">()]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">grouped_data</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span><span class="o">.</span><span class="n">transpose</span><span class="p">()[</span><span class="n">labels</span><span class="p">]</span>
+
+        <span class="n">graphs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">grouped_data</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">transpose</span><span class="p">()[</span><span class="n">labels</span><span class="p">])</span>
+        <span class="c1"># median_vals = list(grouped_data.apply(lambda x: x[2]).transpose()[labels])</span>
+        <span class="n">scatter_min</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;min&#39;</span><span class="p">],</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;markers&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;min&#39;</span><span class="p">,</span> <span class="n">showlegend</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="c1"># scatter_median = go.Scatter(x=data.columns, y=median_vals, mode=&#39;line&#39;, name=&#39;median&#39;, line=dict(shape=&#39;spline&#39;)</span>
+        <span class="n">scatter_mean</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">],</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;line&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="s1">&#39;spline&#39;</span><span class="p">))</span>
+        <span class="n">graphs</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">scatter_min</span><span class="p">,</span> <span class="n">scatter_mean</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">graphs</span></div></div>
+
+
+<div class="viewcode-block" id="read_fastq"><a class="viewcode-back" href="../to_the_code.html#seq_tables.read_fastq">[docs]</a><span class="k">def</span> <span class="nf">read_fastq</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">use_header_as_index</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">use_pandas</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load a fastq file as class SeqTable</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">group_fastq</span><span class="p">(</span><span class="n">index</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">index</span> <span class="o">%</span> <span class="mi">4</span>
+    <span class="k">if</span> <span class="n">use_pandas</span><span class="p">:</span>
+        <span class="n">grouped</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">group_fastq</span><span class="p">)</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">grouped</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+        <span class="n">seqs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">grouped</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">quals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">grouped</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="mi">3</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">seqs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">quals</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">SeqIO</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="s1">&#39;fastq&#39;</span><span class="p">):</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">seq</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;fastq&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">header</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">seqs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">quals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">seqtable</span><span class="p">(</span><span class="n">seqs</span><span class="p">,</span> <span class="n">quals</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">header</span><span class="p">,</span> <span class="n">seqtype</span><span class="o">=</span><span class="s1">&#39;NT&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="read_sam"><a class="viewcode-back" href="../to_the_code.html#seq_tables.read_sam">[docs]</a><span class="k">def</span> <span class="nf">read_sam</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span> <span class="n">cleave_softclip</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">use_header_as_index</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load a SAM file into class SeqTable</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">skiplines</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">r</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;@&#39;</span><span class="p">:</span>
+                <span class="n">skiplines</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+
+    <span class="n">cols_to_use</span> <span class="o">=</span> <span class="p">[</span><span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">use_header_as_index</span><span class="p">:</span>
+        <span class="n">cols_to_use</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">index_col</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">index_col</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">if</span> <span class="n">cleave_softclip</span><span class="p">:</span>
+        <span class="n">cols_to_use</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="n">index_col</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="n">cols_to_use</span><span class="p">,</span> <span class="n">skiprows</span><span class="o">=</span><span class="n">skiplines</span><span class="p">)</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span>
+    <span class="k">return</span> <span class="n">seqtable</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="mi">9</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span> <span class="n">index</span><span class="p">,</span> <span class="s1">&#39;NT&#39;</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Seq Table Documentation</a> &raquo;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2016, Constantine Chrysostomou.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4.1.
+    </div>
+  </body>
+</html>

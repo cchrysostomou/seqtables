@@ -1,0 +1,611 @@
+
+
+<!doctype html>
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Jumping into the source code for seqtables &mdash; Seq Table Documentation</title>
+    
+    <link rel="stylesheet" href="_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.5',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/bizstyle.js"></script>
+    <link rel="top" title="Seq Table Documentation" href="index.html" />
+    <link rel="prev" title="Documenation for the starting repository of seqtable" href="index.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Documenation for the starting repository of seqtable"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Seq Table Documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Documenation for the starting repository of seqtable</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/to_the_code.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-seq_tables">
+<span id="jumping-into-the-source-code-for-seqtables"></span><span id="to-the-code"></span><h1>Jumping into the source code for seqtables<a class="headerlink" href="#module-seq_tables" title="Permalink to this headline">¶</a></h1>
+<p><strong>We can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position
+and accessing specific positions of an aligned sequence</strong></p>
+<dl class="function">
+<dt id="seq_tables.draw_seqlogo_barplots">
+<code class="descclassname">seq_tables.</code><code class="descname">draw_seqlogo_barplots</code><span class="sig-paren">(</span><em>seq_dist</em>, <em>alphabet=None</em>, <em>label_cutoff=0.09</em>, <em>use_properties=True</em>, <em>additional_text={}</em>, <em>show_consensus=True</em>, <em>scale_by_distance=False</em>, <em>title=''</em>, <em>annotation_font_size=14</em>, <em>yaxistitle=''</em>, <em>bargap=None</em>, <em>plotwidth=None</em>, <em>plotheight=500</em>, <em>num_y_ticks=3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#draw_seqlogo_barplots"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.draw_seqlogo_barplots" title="Permalink to this definition">¶</a></dt>
+<dd><p>Uses plotly to generate a sequence logo as a series of bar graphs. This method of sequence logo is taken from the following source:</p>
+<blockquote>
+<div><p>Repository: <a class="reference external" href="https://github.com/ISA-tools/SequenceLogoVis">https://github.com/ISA-tools/SequenceLogoVis</a></p>
+<p>Paper: E. Maguire, P. Rocca-Serra, S.-A. Sansone, and M. Chen, Redesigning the sequence logo with glyph-based approaches to aid interpretation, In Proceedings of EuroVis 2014, Short Paper (2014)</p>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>seq_dist</strong> (<em>Dataframe</em>) &#8211; <p>Rows should be unique letters, Columns should be a specific position within the sequence,</p>
+<p>Values should be the values that represent the frequency OR bits of a specific letter at a specific position</p>
+</li>
+<li><strong>alphabet</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; AA or NT</li>
+<li><strong>label_cutoff</strong> (<em>int, default=0.09</em>) &#8211; Defines a cutoff for when to stop adding &#8216;text&#8217; labels to the plot (i.e. dont add labels for low freq letters)</li>
+<li><strong>use_properties</strong> (<em>bool, default=True</em>) &#8211; If True and if the alphabet is AA then it will color AA by their properties</li>
+<li><strong>additional_text</strong> (<em>list of tuples</em>) &#8211; <p>For each tuple, element 0 is string/label, element 1 is string of letters at each position.</p>
+<p>i.e. additional_text = [(&#8216;text&#8217;, &#8216;AACCA&#8217;), (&#8216;MORE&#8217;, &#8216;ATTTT&#8217;)]. This is meant to add extra</p>
+<p>layers of information for the sequence. For example may you would like to include the WT sequence at the bottom</p>
+</li>
+<li><strong>show_consensus</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True will show the consensus sequence at the bottom of the graph</li>
+<li><strong>scale_by_distance</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; <p>If True, then each x-coordinate of the bar graph will be equal to the column position in the dataframe.</p>
+<p>For example if you are showing a motif in residues 10, 50, and 90 then the xcoordinates of the bars wil be 10, 50, 90 rather than 1,2,3</p>
+</li>
+<li><strong>annotation_font_size</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; size of text font</li>
+<li><strong>yaxistitle</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; how to label the  y axis</li>
+<li><strong>bargap</strong> (<em>float, default=None</em>) &#8211; bargap parameter for plots. If None, then lets plotly handle it</li>
+<li><strong>plotwidth</strong> (<em>float, default=None</em>) &#8211; defines the total width of the plot and individual bars</li>
+<li><strong>num_y_ticks</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; How many ytick labels should appear in plot</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>fig</strong> &#8211;     plot object for plotting in plotly</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">plotly.graph_objs.Figure</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Examples</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">seq_tables</span> <span class="k">import</span> <span class="n">draw_seqlogo_barplots</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">plotly.offline</span> <span class="k">import</span> <span class="n">iplot</span><span class="p">,</span> <span class="n">init_notebook_mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">init_notebook_mode</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">distribution</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="mi">1</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">0</span> <span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="mi">2</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">],</span> <span class="mi">3</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">4</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">]},</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="s1">&#39;G&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plotdata</span> <span class="o">=</span> <span class="n">draw_seqlogo_barplots</span><span class="p">(</span><span class="n">distribution</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">iplot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="seq_tables.get_quality_dist">
+<code class="descclassname">seq_tables.</code><code class="descname">get_quality_dist</code><span class="sig-paren">(</span><em>qual_df, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#get_quality_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.get_quality_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bins</strong> (<em>list of ints or tuples, default=None</em>) &#8211; <p>bins defines how to group together the columns/sequence positions when aggregating the statistics.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>bins=None</p>
+<p class="last">If bins is none, then by default, bins are set to the same ranges defined by fastqc report</p>
+</div>
+</li>
+<li><strong>percentiles</strong> (<em>list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]</em>) &#8211; value passed into pandas describe() function.</li>
+<li><strong>exclude_null_quality</strong> (<em>boolean, default=True</em>) &#8211; do not include quality scores of 0 in the distribution</li>
+<li><strong>sample</strong> (<em>int, default=None</em>) &#8211; If defined, then we will only calculate the distribution on a random subsampled population of sequences</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>data</strong> &#8211; contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
+graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">DataFrame</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Examples</p>
+<p>Show the median of the quality at the first ten positions in the sequence</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">table</span> <span class="o">=</span> <span class="n">SeqTable</span><span class="p">([</span><span class="s1">&#39;AAAAAAAAAA&#39;</span><span class="p">,</span> <span class="s1">&#39;AAAAAAAAAC&#39;</span><span class="p">,</span> <span class="s1">&#39;CCCCCCCCCC&#39;</span><span class="p">],</span> <span class="n">qualitydata</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;6AA9-C9--6C&#39;</span><span class="p">,</span> <span class="s1">&#39;6AA!1C9BA6C&#39;</span><span class="p">,</span> <span class="s1">&#39;6AA!!C9!-6C&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">box_data</span><span class="p">,</span> <span class="n">graphs</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">get_quality_dist</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span> <span class="n">percentiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Now repeat the example from above, except group together all values from the first 5 bases and the next 5 bases
+i.e.  All qualities between positions 0-4 will be grouped together before performing median, and all qualities between 5-9 will be grouped together). Also, return the bottom 10 and upper 90 percentiles in the statsitics</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">box_data</span><span class="p">,</span> <span class="n">graphs</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">get_quality_dist</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="mi">4</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">9</span><span class="p">)],</span> <span class="n">percentiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>We can also plot the results as a series of boxplots using plotly
+&gt;&gt;&gt; from plotly.offline import init_notebook_mode, iplot, plot, iplot_mpl
+# assuming ipython..
+&gt;&gt;&gt; init_notebook_mode()
+&gt;&gt;&gt; plotly.iplot(graphs)
+# using outside of ipython
+&gt;&gt;&gt; plotly.plot(graphs)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="seq_tables.read_fastq">
+<code class="descclassname">seq_tables.</code><code class="descname">read_fastq</code><span class="sig-paren">(</span><em>input_file</em>, <em>limit=None</em>, <em>chunk_size=10000</em>, <em>use_header_as_index=True</em>, <em>use_pandas=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#read_fastq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.read_fastq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a fastq file as class SeqTable</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="seq_tables.read_sam">
+<code class="descclassname">seq_tables.</code><code class="descname">read_sam</code><span class="sig-paren">(</span><em>input_file</em>, <em>limit=None</em>, <em>chunk_size=100000</em>, <em>cleave_softclip=False</em>, <em>use_header_as_index=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#read_sam"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.read_sam" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a SAM file into class SeqTable</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="seq_tables.seqtable">
+<em class="property">class </em><code class="descclassname">seq_tables.</code><code class="descname">seqtable</code><span class="sig-paren">(</span><em>seqdata=None</em>, <em>qualitydata=None</em>, <em>start=1</em>, <em>index=None</em>, <em>seqtype='NT'</em>, <em>phred_adjust=33</em>, <em>null_qual='!'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for viewing aligned sequences within a list or dataframe. This will take a list of sequences and create views such that
+we can access each position within specific positions. It will also associate quality scores for each base if provided.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>seqdata</strong> (<em>Series, or list of strings</em>) &#8211; List containing a set of sequences aligned to one another</li>
+<li><strong>qualitydata</strong> (<em>Series or list of quality scores, default=None</em>) &#8211; If defined, then user is passing in quality data along with the sequences)</li>
+<li><strong>start</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Explicitly define where the aligned sequences start with respect to some refernce frame (i.e. start &gt; 2 means sequences start at position 2 not 1)</li>
+<li><strong>index</strong> (<em>list of values defining the index, default=None</em>) &#8211; </li>
+<li><strong>seqtype</strong> (<em>string of 'AA' or 'NT', default='NT'</em>) &#8211; Defines the format of the data being passed into the dataframe</li>
+<li><strong>phred_adjust</strong> (<em>integer, default=33</em>) &#8211; If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="attribute">
+<dt id="seq_tables.seqtable.seq_df">
+<code class="descname">seq_df</code><a class="headerlink" href="#seq_tables.seqtable.seq_df" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Dataframe</em> &#8211; Each row in the dataframe is a sequence. It will always contain a &#8216;seqs&#8217; column representing the sequences past in. Optionally it will also contain a &#8216;quals&#8217; column representing quality scores</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="seq_tables.seqtable.seq_table">
+<code class="descname">seq_table</code><a class="headerlink" href="#seq_tables.seqtable.seq_table" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Dataframe</em> &#8211; Dataframe representing sequences as characters in a table. Each row in the dataframe is a sequence. Each column represents the position of a base/residue within the sequence. The 4th position of sequence 2 is found as seq_table.ix[1, 4]</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="seq_tables.seqtable.qual_table">
+<code class="descname">qual_table</code><a class="headerlink" href="#seq_tables.seqtable.qual_table" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Dataframe, optional</em> &#8211; Dataframe representing the quality score for each character in seq_table</p>
+</dd></dl>
+
+<p class="rubric">Examples</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">sq</span> <span class="o">=</span> <span class="n">seq_tables</span><span class="o">.</span><span class="n">seqtable</span><span class="p">([</span><span class="s1">&#39;AAA&#39;</span><span class="p">,</span> <span class="s1">&#39;ACT&#39;</span><span class="p">,</span> <span class="s1">&#39;ACA&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sq</span><span class="o">.</span><span class="n">hamming_distance</span><span class="p">(</span><span class="s1">&#39;AAA&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sq</span> <span class="o">=</span> <span class="n">read_fastq</span><span class="p">(</span><span class="s1">&#39;fastqfile.fq&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="seq_tables.seqtable.adjust_ref_seq">
+<code class="descname">adjust_ref_seq</code><span class="sig-paren">(</span><em>ref</em>, <em>table_columns</em>, <em>ref_start</em>, <em>return_as_np=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.adjust_ref_seq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.adjust_ref_seq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Aligns a reference sequence such that its position matches positions within the seqtable of interest</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ref</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; Represents the reference sequence</li>
+<li><strong>table_columns</strong> (<em>list or series</em>) &#8211; Defines the column positions or column names</li>
+<li><strong>ref_start</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Defines where the reference starts relative to the sequence</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.compare_to_reference">
+<code class="descname">compare_to_reference</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>flip=False</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>return_num_bases=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.compare_to_reference"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.compare_to_reference" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate which positions within a reference are not equal in all sequences in dataframe</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>flip</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then find bases that ARE MISMATCHES(NOT equal) to the reference</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>ignore_characters</strong> (<em>char or list of chars</em>) &#8211; When performing distance/finding mismatches, always treat these characters as matches</li>
+<li><strong>return_num_bases</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; <p>If true, returns a second argument defining the number of relevant bases present in each row</p>
+<p>..important:: Change in output results</p>
+<blockquote>
+<div>Setting return_num_bases to true will change how results are returned (two elements rather than one are returned)</div></blockquote>
+</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Dataframe of boolean variables showing whether base is equal to reference at each position</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.convert_low_bases_to_null">
+<code class="descname">convert_low_bases_to_null</code><span class="sig-paren">(</span><em>q</em>, <em>replace_with='N'</em>, <em>inplace=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.convert_low_bases_to_null"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.convert_low_bases_to_null" title="Permalink to this definition">¶</a></dt>
+<dd><p>This will convert all letters whose corresponding quality is below a cutoff to the value replace_with</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>q</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; quality score cutoff, convert all bases whose quality is &lt; than q</li>
+<li><strong>inplace</strong> (<em>boolean</em>) &#8211; If False, returns a copy of the object filtered by quality score</li>
+<li><strong>replace_with</strong> (<em>char</em>) &#8211; a character to replace low bases with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.get_consensus">
+<code class="descname">get_consensus</code><span class="sig-paren">(</span><em>positions=None</em>, <em>modecutoff=0.5</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.get_consensus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.get_consensus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the sequence consensus of the bases at the defined positions</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>positions</strong> &#8211; Slice which positions in the table should be conidered</li>
+<li><strong>modecutoff</strong> &#8211; Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.get_quality_dist">
+<code class="descname">get_quality_dist</code><span class="sig-paren">(</span><em>bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.get_quality_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.get_quality_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bins</strong> (<em>list of ints or tuples, default=None</em>) &#8211; <p>bins defines how to group together the columns/sequence positions when aggregating the statistics.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>bins=None</p>
+<p class="last">If bins is none, then by default, bins are set to the same ranges defined by fastqc report</p>
+</div>
+</li>
+<li><strong>percentiles</strong> (<em>list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]</em>) &#8211; value passed into pandas describe() function.</li>
+<li><strong>exclude_null_quality</strong> (<em>boolean, default=True</em>) &#8211; do not include quality scores of 0 in the distribution</li>
+<li><strong>sample</strong> (<em>int, default=None</em>) &#8211; If defined, then we will only calculate the distribution on a random subsampled population of sequences</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>data</strong> &#8211; contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
+graphs (plotly object): contains plotly graph objects for generating plots of the data afterwards</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">DataFrame</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Examples</p>
+<p>Show the median of the quality at the first ten positions in the sequence</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">table</span> <span class="o">=</span> <span class="n">SeqTable</span><span class="p">([</span><span class="s1">&#39;AAAAAAAAAA&#39;</span><span class="p">,</span> <span class="s1">&#39;AAAAAAAAAC&#39;</span><span class="p">,</span> <span class="s1">&#39;CCCCCCCCCC&#39;</span><span class="p">],</span> <span class="n">qualitydata</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;6AA9-C9--6C&#39;</span><span class="p">,</span> <span class="s1">&#39;6AA!1C9BA6C&#39;</span><span class="p">,</span> <span class="s1">&#39;6AA!!C9!-6C&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">box_data</span><span class="p">,</span> <span class="n">graphs</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">get_quality_dist</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span> <span class="n">percentiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Now repeat the example from above, except group together all values from the first 5 bases and the next 5 bases
+i.e.  All qualities between positions 0-4 will be grouped together before performing median, and all qualities between 5-9 will be grouped together). Also, return the bottom 10 and upper 90 percentiles in the statsitics</p>
+<div class="highlight-default"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">box_data</span><span class="p">,</span> <span class="n">graphs</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">get_quality_dist</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="mi">4</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">9</span><span class="p">)],</span> <span class="n">percentiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>We can also plot the results as a series of boxplots using plotly
+&gt;&gt;&gt; from plotly.offline import init_notebook_mode, iplot, plot, iplot_mpl
+# assuming ipython..
+&gt;&gt;&gt; init_notebook_mode()
+&gt;&gt;&gt; plotly.iplot(graphs)
+# using outside of ipython
+&gt;&gt;&gt; plotly.plot(graphs)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.get_seq_dist">
+<code class="descname">get_seq_dist</code><span class="sig-paren">(</span><em>positions=None</em>, <em>method='counts'</em>, <em>ignore_characters=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.get_seq_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.get_seq_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the distribution of bases or amino acids at each position.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.hamming_distance">
+<code class="descname">hamming_distance</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>normalized=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.hamming_distance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.hamming_distance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determine hamming distance of all sequences in dataframe to a reference sequence.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>normalized</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then divides hamming distance by the number of relevant bases</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_TS_TV_profile">
+<code class="descname">mutation_TS_TV_profile</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_TS_TV_profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_TS_TV_profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the ratio of transition rates (A-&gt;G, C-&gt;T) to transversion rates (A-&gt;T/C) observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>ratio</strong> &#8211; TS Freq / TV Freq
+TS (float): TS Freq
+TV (float): TV Freq</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/library/functions.html#float" title="(in Python v2.7)">float</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_profile">
+<code class="descname">mutation_profile</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>normalized=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of mutation rates observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>normalized</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then frequency of each mutation</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>profile</strong> &#8211; Returns the counts (or frequency) for each mutation observed (i.e. A-&gt;C or A-&gt;T)</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">pd.Series</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_profile_deprecated">
+<code class="descname">mutation_profile_deprecated</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>normalized=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_profile_deprecated"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_profile_deprecated" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of mutation rates observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>normalized</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then frequency of each mutation</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><p><strong>profile</strong> &#8211; Returns the counts (or frequency) for each mutation observed (i.e. A-&gt;C or A-&gt;T)
+transversions (float): Returns frequency of transversion mutation
+transition (float): Returns frequency of transition mutation</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Transversion and transitions only apply to situations when the seqtype is a NT</p>
+</div>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">pd.Series</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This function has been deprecated because we found a better speed-optimized method</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.qual_to_table">
+<code class="descname">qual_to_table</code><span class="sig-paren">(</span><em>qualphred</em>, <em>phred_adjust=33</em>, <em>return_table=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.qual_to_table"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.qual_to_table" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a set of quality score strings, updates the  return a new dataframe such that each column represents the quality at each position as a number</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>qualphred</strong> &#8211; (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)</li>
+<li><strong>phred_adjust</strong> (<em>integer, default=33</em>) &#8211; If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)</li>
+<li><strong>return_table</strong> (<em>boolean, default=False</em>) &#8211; If True, then the attribute self.qual_table is returned</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>self.qual_table</strong> &#8211; each row corresponds to a specific sequence and each column corresponds to</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Dataframe</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.quality_filter">
+<code class="descname">quality_filter</code><span class="sig-paren">(</span><em>q</em>, <em>p</em>, <em>inplace=False</em>, <em>ignore_null_qual=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.quality_filter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.quality_filter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filter out sequences based on their average qualities at each base/position</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>q</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; quality score cutoff</li>
+<li><strong>p</strong> (<em>int/float/percent 0-100</em>) &#8211; the percent of bases that must have a quality &gt;= the cutoff q</li>
+<li><strong>inplace</strong> (<em>boolean</em>) &#8211; If False, returns a copy of the object filtered by quality score</li>
+<li><strong>ignore_null_qual</strong> (<em>boolean</em>) &#8211; Ignore bases that are not represented. (i.e. those with quality of 0)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.subsample">
+<code class="descname">subsample</code><span class="sig-paren">(</span><em>numseqs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.subsample"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.subsample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a random sample of sequences as a new object</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>numseqs</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; How many sequences to sample</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">SeqTable Object</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.table_to_seq">
+<code class="descname">table_to_seq</code><span class="sig-paren">(</span><em>new_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.table_to_seq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.table_to_seq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the sequence list</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.update_seqdf">
+<code class="descname">update_seqdf</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.update_seqdf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.update_seqdf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make seq_df attribute in sync with seq_table and qual_table
+Sometimes it might be useful to make changes to the seq_table attribute. For example, may you have your own custom code where you change the values of seq_table
+to be &#8216;.&#8217; or something random. Well you want to make sure that seq_df updates accordingly because the full length strings are the most useful in the end</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Documenation for the starting repository of seqtable"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Seq Table Documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2016, Constantine Chrysostomou.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.4b1.
+    </div>
+  </body>
+</html>
