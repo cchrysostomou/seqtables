@@ -45,7 +45,11 @@ degen_to_base = {
 dna_alphabet = list('ACTG') + sorted(list(set(sorted(degen_to_base.values())) - set('ACTG'))) + ['-.']
 aa_alphabet = list('ACDEFGHIKLMNPQRSTVWYX*Z-.')
 
-amino_acid_color_properties = defaultdict(lambda: {"color": "#f1f2f1", "name": "Unknown"}, {
+amino_acid_color_properties = defaultdict(lambda:
+    {
+        "color": "#f1f2f1", "name": "Unknown"
+    },
+    {
         'R': {"color": "#1FAABD", "name": "Arginine", "short": "Ala", "charge": 1, "hydropathy": -4.5},
         'H': {"color": "#1FAABD", "name": "Histidine", "short": "His", "charge": 1, "hydropathy": -3.2},
         'K': {"color": "#1FAABD", "name": "Lysine", "short": "Lys", "charge": 1, "hydropathy": -3.9},
@@ -95,7 +99,7 @@ def strseries_to_bytearray(series, fillvalue):
     return (series, seq_as_int)
 
 
-def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_properties=True, additional_text = {}, show_consensus=True, scale_by_distance=False, annotation_font_size=14, yaxistitle='', bargap=None, plotwidth=None, num_y_ticks = 3):
+def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_properties=True, additional_text = {}, show_consensus=True, scale_by_distance=False, title='', annotation_font_size=14, yaxistitle='', bargap=None, plotwidth=None, plotheight=500, num_y_ticks = 3):
     """
     Uses plotly to generate a sequence logo as a series of bar graphs. This method of sequence logo is taken from the following source:
 
@@ -163,6 +167,7 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
 
 
     """
+    warnings.warn('Currently only frequency logos are used, will allow for entropy in future')
     seq_dist = seq_dist.copy()
     if plotly_installed is False:
         warnings.warn('Cannot generate seq logo plots. Please install plotly')
@@ -178,19 +183,19 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
         colors = {c1: dna_colors[c1]['color'] for c1 in list(dna_colors.keys()) + list(seq_dist.index)}
     elif alphabet.lower() == 'aa':
         if use_properties is True:
-            colors = {c1: amino_acid_color_properties[c1]['color'] for c1 in list(amino_acid_color_properties.keys()) + list(seq_dist.index) }
+            colors = {c1: amino_acid_color_properties[c1]['color'] for c1 in list(amino_acid_color_properties.keys()) + list(seq_dist.index)}
 
     labels = seq_dist.columns
     if scale_by_distance is False:
-        seq_dist = seq_dist.rename(columns = {r: i + 1 for i, r in enumerate(seq_dist.columns)})
+        seq_dist = seq_dist.rename(columns={r: i + 1 for i, r in enumerate(seq_dist.columns)})
         max_dist = seq_dist.shape[1] + 1
     else:
         start = min(seq_dist.columns)
-        seq_dist = seq_dist.rename(columns = {r: r - start + 1 for i, r in enumerate(seq_dist.columns)})
+        seq_dist = seq_dist.rename(columns={r: r - start + 1 for i, r in enumerate(seq_dist.columns)})
         max_dist = max(seq_dist.columns) + 1
 
     if plotwidth is None:
-        plotwidth=max(400, ((350/6.0) * seq_dist.shape[1]))
+        plotwidth = max(400, ((350 / 6.0) * seq_dist.shape[1]))
 
     cnt = 0
     for i in seq_dist.columns:
@@ -198,29 +203,34 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
         l = False if cnt > 0 else True
         for name, val in seq_dist.loc[:, i].sort_values().iteritems():
             top += val
-            data.append(go.Bar(y = [val],
-                   x=[i],
-                   name=name,
-                   marker =dict(
-                        color= colors[name],
-                        line = dict(
-                           color='white',
-                        width = 1.50)
+            data.append(
+                go.Bar(
+                    y=[val],
+                    x=[i],
+                    name=name,
+                    marker=dict(
+                        color=colors[name],
+                        line=dict(
+                            color='white',
+                            width=1.50
+                        )
                     ),
-                   legendgroup = name,
-                     showlegend=l
-                  ),
+                    legendgroup=name,
+                    showlegend=l
+                ),
             )
             if val > label_cutoff:
                 annotation.append(
-                    dict(x=i,
+                    dict(
+                        x=i,
                         y=top,
                         align='center',
                         xanchor='center',
                         yanchor='top',
                         text=name,
                         font=dict(color='white', size=annotation_font_size),
-                        showarrow=False)
+                        showarrow=False
+                    )
                 )
         cnt += 1
     consensus_seq = seq_dist.idxmax()
@@ -229,37 +239,40 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
     for pos, xc in enumerate(seq_dist.columns):
         if show_consensus:
             annotation.append(
-                dict(x=xc,
-                    y= -0.1,
+                dict(
+                    x=xc,
+                    y=-0.1,
                     align='center',
                     xanchor='center',
                     yanchor='top',
                     text=consensus_seq[xc],
                     font=dict(color=colors[consensus_seq[xc]], size=annotation_font_size),
-                    showarrow=False)
+                    showarrow=False
+                )
             )
-
 
         for numk, rows in enumerate(additional_text):
             key = rows[0]
             textval = rows[1]
             if pos < len(textval):
                 annotation.append(
-                dict(x=xc,
-                    y= -0.1 * (numk + 1) + starting_y,
-                    align='center',
-                    xanchor='center',
-                    yanchor='top',
-                    text=textval[pos],
-                    font=dict(color=colors[textval[pos]], size=annotation_font_size),
-                    showarrow=False)
+                    dict(
+                        x=xc,
+                        y=-0.1 * (numk + 1) + starting_y,
+                        align='center',
+                        xanchor='center',
+                        yanchor='top',
+                        text=textval[pos],
+                        font=dict(color=colors[textval[pos]], size=annotation_font_size) if textval[pos] in colors else dict(color='black', size=annotation_font_size),
+                        showarrow=False
+                    )
                 )
-
 
     if show_consensus:
         annotation.append(
-            dict(x=-0.1,
-                y= -0.1,
+            dict(
+                x=-0.1,
+                y=-0.1,
                 align='center',
                 xanchor='right',
                 yanchor='top',
@@ -270,16 +283,17 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
 
     for numk, rows in enumerate(additional_text):
         annotation.append(
-        dict(x=-0.1,
-            y= -0.1 * (numk + 1) + starting_y,
-            align='center',
-            xanchor='right',
-            yanchor='top',
-            text=rows[0],
-            font=dict(color='black', size=12),
-            showarrow=False)
+            dict(
+                x=-0.1,
+                y=-0.1 * (numk + 1) + starting_y,
+                align='center',
+                xanchor='right',
+                yanchor='top',
+                text=rows[0],
+                font=dict(color='black', size=12),
+                showarrow=False
+            )
         )
-
 
     num_y_ticks = max(3, num_y_ticks)
     miny = 0  # math.floor(seq_dist.min().min())
@@ -291,24 +305,23 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
         tick_vals.append(round(tmp, 2))
         tmp += tick_steps
 
-
     layout = go.Layout(
         barmode='stack',
         annotations=annotation,
         yaxis=dict(showgrid=False, rangemode='nonnegative', tickvals=tick_vals, zeroline=False, showline=True, title=yaxistitle, ),
-        xaxis=dict(showgrid=False, rangemode='nonnegative', side='top', showline=False, zeroline=False, ticktext=labels, tickvals = seq_dist.columns),
+        xaxis=dict(showgrid=False, rangemode='nonnegative', side='top', showline=False, zeroline=False, ticktext=labels, tickvals=seq_dist.columns),
         # xaxis2=dict(overlaying='x', side='bottom', tickvals = seq_dist.columns, ticktext = consensus_seq),
         legend=dict(traceorder='reversed'),
         width=plotwidth,
+        title=title,
+        height=plotheight
         # margin={'l': 90}
     )
-
 
     if bargap is not None:
         layout['bargap'] = bargap
     fig = go.Figure(data=data, layout=layout)
-    return fig
-
+    return fig, data, layout
 
 
 def get_quality_dist(qual_df, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None):
@@ -551,8 +564,9 @@ class seqtable():
         new_member.index = template.index
         return new_member
 
-    def view_bases(self, as_dataframe=False):
-        return self.seq_table.values.view('S1')
+    def view_bases(self, as_dataframe=False, side_by_side=False, num_base_show=10):
+        np.set_printoptions(edgeitems=num_base_show)
+        return self.seq_table.values.view('S1').T if side_by_side is True else self.seq_table.values.view('S1')
 
     def shape(self):
         return self.seq_table.shape
@@ -661,32 +675,32 @@ class seqtable():
 
                         Setting return_num_bases to true will change how results are returned (two elements rather than one are returned)
 
+
             Returns:
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
-        reference_seq = reference_seq.upper()
-        compare_column_header = list(self.seq_table.columns)
-        if ref_start < 0:
-            # simple: the reference sequence is too long, so just trim it
-            reference_seq = reference_seq[(-1 * ref_start):]
-        elif ref_start > 0:
-            reference_seq = self.fillna_val * ref_start + reference_seq
-            # more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not
-            # found in reference sequence provided
-            if positions is None:
-                positions = compare_column_header
-            ignore_postions = compare_column_header[ref_start]
-            before_filter = positions
-            positions = [p for p in positions if p >= ref_start]
-            if len(positions) < len(before_filter):
-                warnings.warn("Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}".format(','.join([_ for _ in before_filter[:ref_start]])))
-            compare_column_header = compare_column_header[ref_start:]
 
-        # adjust reference length
-        if len(reference_seq) > self.seq_table.shape[1]:
-            reference_seq = reference_seq[:self.seq_table.shape[1]]
-        elif len(reference_seq) < self.seq_table.shape[1]:
-            reference_seq = reference_seq + self.fillna_val * (self.seq_table.shape[1] - len(reference_seq))
+        # reference_seq = reference_seq.upper()
+        # compare_column_header = list(self.seq_table.columns)
+        # if ref_start < 0:
+        #     # simple: the reference sequence is too long, so just trim it
+        #     reference_seq = reference_seq[(-1 * ref_start):]
+        # elif ref_start > 0:
+        #     reference_seq = self.fillna_val * ref_start + reference_seq
+        #     # more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not
+        #     # found in reference sequence provided
+        #     if positions is None:
+        #         positions = compare_column_header
+        #     ignore_postions = compare_column_header[ref_start]
+        #     before_filter = positions
+        #     positions = [p for p in positions if p >= ref_start]
+        #     if len(positions) < len(before_filter):
+        #         warnings.warn("Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}".format(','.join([_ for _ in before_filter[:ref_start]])))
+        #     compare_column_header = compare_column_header[ref_start:]
+
+        # convert reference to numbers
+        # reference_array = np.array(bytearray(reference_seq))[ref_cols]
+        reference_array, compare_column_header = self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)
 
         if set_diff is True:
             # change positions of interest to be the SET DIFFERENCE of positions parameter
@@ -702,21 +716,17 @@ class seqtable():
                 positions = sorted(list(set(positions) & set(compare_column_header)))
                 ref_cols = [i for i, c in enumerate(compare_column_header) if c in positions]
 
-        # convert reference to numbers
-        # reference_array = np.array(bytearray(reference_seq))[ref_cols]
-        reference_array = np.array([reference_seq], dtype='S').view(np.uint8)[ref_cols]
-
         # actually compare distances in each letter (find positions which are equal)
-        diffs = self.seq_table[positions].values == reference_array  # if flip is False else self.seq_table[positions].values != reference_array
+        diffs = self.seq_table[positions].values == reference_array[ref_cols]  # if flip is False else self.seq_table[positions].values != reference_array
 
         if ignore_characters:
             if not isinstance(ignore_characters, list):
                 ignore_characters = [ignore_characters]
             ignore_characters = [ord(let) for let in ignore_characters]
             # now we have to ignore characters that are equal to specific values
-            ignore_pos = (self.seq_table[positions].values == ignore_characters[0]) | (reference_array == ignore_characters[0])
+            ignore_pos = (self.seq_table[positions].values == ignore_characters[0]) | (reference_array[ref_cols] == ignore_characters[0])
             for chr_p in range(1, len(ignore_characters)):
-                ignore_pos = ignore_pos | (self.seq_table[positions].values == ignore_characters[chr_p]) | (reference_array == ignore_characters[chr_p])
+                ignore_pos = ignore_pos | (self.seq_table[positions].values == ignore_characters[chr_p]) | (reference_array[ref_cols] == ignore_characters[chr_p])
 
             # now adjust boolean results to ignore any positions == ignore_characters
             diffs = (diffs | ignore_pos)  # if flip is False else (diffs | ignore_pos)
@@ -750,6 +760,128 @@ class seqtable():
         else:
             diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
             return pd.Series(diffs.values.sum(axis=1), index=diffs.index)  # columns=c1, index=ind1)
+
+    def mutation_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized=False):
+        """
+            Return the type of mutation rates observed between the reference sequence and sequences in table.
+
+            Args:
+                reference_seq (string): A string that you want to align sequences to
+                positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare
+                ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
+                set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
+                normalized (bool): If True, then frequency of each mutation
+
+            Returns:
+                profile (pd.Series): Returns the counts (or frequency) for each mutation observed (i.e. A->C or A->T)
+        """
+        # def reference sequence
+        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'}).transpose()
+        # compare all bases/residues to the reference seq (returns a dataframe of boolean vars)
+        not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
+        # now create a numpy array in which the reference is repeated N times where n = # sequences
+        ref = ref[not_equal_to.columns]
+        ref_matrix = np.tile(ref, (self.seq_table.shape[0], 1))
+        # now create a numpy array of ALL bases in the seq table that were not equal to the reference
+        subset = self.seq_table[not_equal_to.columns]
+        var_bases_unique = subset.values[(not_equal_to.values)]
+        # now create a corresponding numpy array of ALL bases in teh REF TABLE where that base was not equal in the seq table
+        # each index in this variable corresponds to the index (seq #, base position) in var_bases_unique
+        ref_bases_unique = ref_matrix[(not_equal_to.values)]
+        # OK lets do some fancy numpy methods and merge the two arrays, and then convert the 2D into 1D using bit conversion
+        # found this at: https://www.reddit.com/r/learnpython/comments/3v9y8u/how_can_i_find_unique_elements_along_one_axis_of/
+        mutation_combos = np.array([ref_bases_unique, var_bases_unique]).T.copy().view(np.int16)
+        # finally count the instances of each mutation we see (use squeeze(1) to ONLY squeeze single dim)
+        counts = np.bincount(mutation_combos.squeeze(1))
+        unique_mut = np.nonzero(counts)[0]
+        counts = counts[unique_mut]
+        # convert values back to chacters of format (REF BASE/RESIDUE, VAR base/residue)
+        unique_mut = unique_mut.astype(np.uint16).view(np.uint8).reshape(-1, 2).view('S1')
+        # unique_mut, counts = np.unique(mutation_combos.squeeze(), return_counts=True) => this could have worked also, little slower
+        if len(unique_mut) == 0:
+            return pd.Series()
+        mut_index = pd.MultiIndex.from_tuples(list(unique_mut), names=['ref', 'mut'])
+        mutation_counts = pd.Series(index=mut_index, data=counts).astype(float).sort_index()
+        if normalized is True:
+            mutation_counts = mutation_counts / (mutation_counts.sum())
+        del ref_bases_unique
+        del var_bases_unique
+        del mutation_combos
+
+        return mutation_counts
+
+    def mutation_TS_TV_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[]):
+        """
+            Return the ratio of transition rates (A->G, C->T) to transversion rates (A->T/C) observed between the reference sequence and sequences in table.
+
+            Args:
+                reference_seq (string): A string that you want to align sequences to
+                positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare
+                ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
+                set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
+
+            Returns:
+                ratio (float): TS Freq / TV Freq
+                TS (float): TS Freq
+                TV (float): TV Freq
+        """
+        if self.seqtype != 'NT':
+            raise('Error: you cannot calculate TS and TV mutations on AA sequences. Either the seqtype is incorrect or you want to use the function mutation_profile')
+        transitions = [('A', 'G'), ('G', 'A'), ('C', 'T'), ('T', 'C')]
+        transversions = [
+            ('A', 'C'), ('C', 'A'), ('A', 'T'), ('T', 'A'),
+            ('G', 'C'), ('C', 'G'), ('G', 'T'), ('T', 'G'),
+        ]
+
+        mutations = self.mutation_profile(reference_seq, positions, ref_start, set_diff, ignore_characters)
+        if mutations.empty:
+            return np.nan, 0, 0
+        ts_freq = sum([mutations.loc[ts] for ts in transitions if ts in mutations.index]) / mutations.sum()
+        tv_freq = sum([mutations.loc[tv] for tv in transversions if tv in mutations.index]) / mutations.sum()
+
+        return ts_freq / tv_freq, ts_freq, tv_freq
+
+    def mutation_profile_deprecated(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized =False):
+        """
+            Return the type of mutation rates observed between the reference sequence and sequences in table.
+
+            Args:
+                reference_seq (string): A string that you want to align sequences to
+                positions (list, default=None): specific positions in both the reference_seq and sequences you want to compare
+                ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
+                set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
+                normalized (bool): If True, then frequency of each mutation
+
+            Returns:
+                profile (pd.Series): Returns the counts (or frequency) for each mutation observed (i.e. A->C or A->T)
+                transversions (float): Returns frequency of transversion mutation
+                transition (float): Returns frequency of transition mutation
+
+                .. note::
+
+                        Transversion and transitions only apply to situations when the seqtype is a NT
+            .. note::
+
+                This function has been deprecated because we found a better speed-optimized method
+        """
+        # def reference sequence
+        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'})
+        # compare all bases/residues to the reference seq (returns a dataframe of boolean vars)
+        not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
+        subset = self.seq_table[not_equal_to.columns]
+        # stack all mutations that are NOT equal to the reference
+        # this creates a dataframe such that each row is essentially seqpos, base position: letter at that position
+        # delete the level_0 (seqpos) because its trivial to analysis
+        mutation_counts = pd.DataFrame(subset[not_equal_to].stack()).reset_index().rename(columns={0: 'Var base', 'level_1': 'Pos'}).astype(int).drop('level_0', axis=1)
+        # now merge the results from the reference bases, once merge, we can count unique occurrences of ref base -> var base
+        mutation_counts = mutation_counts.merge(ref, left_on='Pos', right_index=True, how='inner')
+        # convert columns  to letters rather than ascii
+        mutation_counts = mutation_counts.groupby(by=['Ref base', 'Var base']).apply(len).reset_index()
+        mutation_counts[['Ref base', 'Var base']] = mutation_counts[['Ref base', 'Var base']].applymap(lambda x: chr(x))
+        mutation_counts = mutation_counts.set_index(['Ref base', 'Var base'])[0]
+        if normalized is True:
+            mutation_counts = mutation_counts / (1.0 * mutation_counts.sum())
+        return mutation_counts
 
     def quality_filter(self, q, p, inplace=False, ignore_null_qual=True):
         """
@@ -797,6 +929,42 @@ class seqtable():
         if inplace is False:
             return meself
 
+    def adjust_ref_seq(self, ref, table_columns, ref_start, return_as_np=True):
+            """
+            Aligns a reference sequence such that its position matches positions within the seqtable of interest
+
+            Args:
+                ref (str): Represents the reference sequence
+                table_columns (list or series): Defines the column positions or column names
+                ref_start (int): Defines where the reference starts relative to the sequence
+
+            """
+            compare_column_header = list(table_columns)
+            reference_seq = ref.upper()
+            if ref_start < 0:
+                # simple: the reference sequence is too long, so just trim it
+                reference_seq = reference_seq[(-1 * ref_start):]
+            elif ref_start > 0:
+                reference_seq = self.fillna_val * ref_start + reference_seq
+                # more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not
+                # found in reference sequence provided
+                if positions is None:
+                    positions = compare_column_header
+                ignore_postions = compare_column_header[ref_start]
+                before_filter = positions
+                positions = [p for p in positions if p >= ref_start]
+                if len(positions) < len(before_filter):
+                    warnings.warn("Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}".format(','.join([_ for _ in before_filter[:ref_start]])))
+                compare_column_header = compare_column_header[ref_start:]
+
+            if len(reference_seq) > len(table_columns):
+                reference_seq = reference_seq[:len(table_columns)]
+            elif len(reference_seq) < len(table_columns):
+                reference_seq = reference_seq + self.fillna_val * (self.seq_table.shape[1] - len(reference_seq))
+
+            return np.array([reference_seq], dtype='S').view(np.uint8) if return_as_np is True else reference_seq, compare_column_header
+
+
     def slice_sequences(self, positions, name='seqs', return_quality=False, empty_chars=None):
         if empty_chars is None:
             empty_chars = self.fillna_val
@@ -841,14 +1009,19 @@ class seqtable():
 
         return substring
 
-    def get_seq_dist(self, positions=None):
+    def get_seq_dist(self, positions=None, method='counts', ignore_characters=[],):
         """
             Returns the distribution of bases or amino acids at each position.
         """
         compare = self.seq_table.loc[:, positions] if positions else self.seq_table
         dist = compare.apply(pd.value_counts).fillna(0)
         dist.rename({c: chr(c) for c in list(dist.index)}, inplace=True)
-        return dist
+        drop_values = list(set(ignore_characters) & set(list(dist.index)))
+        dist = dist.drop(drop_values, axis=0)
+        if method == 'freq':
+            dist = dist.astype(float) / dist.sum(axis=0)
+
+        return dist.fillna(0)
 
     def get_consensus(self, positions=None, modecutoff=0.5):
         """
@@ -866,8 +1039,9 @@ class seqtable():
         seq = dist.view('S' + str(chars))[0]
         return seq
 
-    def seq_logo(self):
-        pass
+    def seq_logo(self, positions=None, method='freq', ignore_characters=[], **kwargs):
+        dist = self.get_seq_dist(positions, method, ignore_characters)
+        return draw_seqlogo_barplots(dist, alphabet=self.seqtype, **kwargs)
 
     def get_quality_dist(self, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None):
         """

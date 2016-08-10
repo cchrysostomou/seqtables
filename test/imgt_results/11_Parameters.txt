@@ -1,0 +1,10 @@
+Date	Wed Jul 27 12:32:16 CEST 2016
+IMGT/V-QUEST programme version	3.3.6
+IMGT/V-QUEST reference directory release	201613-2
+Species	Mus musculus
+Receptor type or locus	IG
+IMGT/V-QUEST reference directory set	 F+ORF+in-frame P
+Search for insertions and deletions	 yes
+Nb of nucleotides to add (or exclude) in 3' of the V-REGION for the evaluation of the alignment score	0
+Nb of nucleotides to exclude in 5' of the V-REGION for the evaluation of the nb of mutations	 0
+Number of submitted sequences	3000
