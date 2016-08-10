@@ -35,13 +35,13 @@ sys.path.insert(0, os.path.abspath("../../"))
 # CC add autodoc and napolean to extension list
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinxcontrib.napoleon',
+    #'sphinxcontrib.napoleon',
      'sphinx.ext.intersphinx',
      'sphinx.ext.todo',
      'sphinx.ext.coverage',
      'sphinx.ext.mathjax',
      'sphinx.ext.viewcode',
-    'sphinx.ext.githubpages',
+    # 'sphinx.ext.githubpages',
     #"sphinxtogithub"
 
 ]
@@ -125,8 +125,8 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #html_theme = "nature"
-# html_theme = "classic"
-html_theme = "bizstyle"
+html_theme = "classic"
+# html_theme = "bizstyle"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
