@@ -4,8 +4,8 @@ Documenation for the starting repository of seqtable
 Tutorial:
 
 See the `Tutorial Page`_ for a quickstart introduction in how to use the class
-See the `Tutorial Page 2`_ for a real-case scenario of using seqtables in sequence analysis
 
+See the `Tutorial Page2`_ for a quickstart introduction in how to use the class
 
 
 Contents:
@@ -25,6 +25,7 @@ Indices and tables
 * :ref:`search`
 
 .. _Tutorial Page: _static/seqtables_tutorial.html
-.. _Tutorail Page 2: _static/seqtables_for_repertoire_analysis.html
+
+.. _Tutorial Page2: _static/seqtables_for_repertoire_analysis.html
 
 
