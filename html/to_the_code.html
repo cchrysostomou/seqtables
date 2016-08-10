@@ -85,7 +85,7 @@
 and accessing specific positions of an aligned sequence</strong></p>
 <dl class="function">
 <dt id="seq_tables.draw_seqlogo_barplots">
-<code class="descclassname">seq_tables.</code><code class="descname">draw_seqlogo_barplots</code><span class="sig-paren">(</span><em>seq_dist</em>, <em>alphabet=None</em>, <em>label_cutoff=0.09</em>, <em>use_properties=True</em>, <em>additional_text={}</em>, <em>show_consensus=True</em>, <em>scale_by_distance=False</em>, <em>annotation_font_size=14</em>, <em>yaxistitle=''</em>, <em>bargap=None</em>, <em>plotwidth=None</em>, <em>num_y_ticks=3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#draw_seqlogo_barplots"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.draw_seqlogo_barplots" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">seq_tables.</code><code class="descname">draw_seqlogo_barplots</code><span class="sig-paren">(</span><em>seq_dist</em>, <em>alphabet=None</em>, <em>label_cutoff=0.09</em>, <em>use_properties=True</em>, <em>additional_text={}</em>, <em>show_consensus=True</em>, <em>scale_by_distance=False</em>, <em>title=''</em>, <em>annotation_font_size=14</em>, <em>yaxistitle=''</em>, <em>bargap=None</em>, <em>plotwidth=None</em>, <em>plotheight=500</em>, <em>num_y_ticks=3</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#draw_seqlogo_barplots"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.draw_seqlogo_barplots" title="Permalink to this definition">¶</a></dt>
 <dd><p>Uses plotly to generate a sequence logo as a series of bar graphs. This method of sequence logo is taken from the following source:</p>
 <blockquote>
 <div><p>Repository: <a class="reference external" href="https://github.com/ISA-tools/SequenceLogoVis">https://github.com/ISA-tools/SequenceLogoVis</a></p>
@@ -247,6 +247,25 @@ we can access each position within specific positions. It will also associate qu
 </pre></div>
 </div>
 <dl class="method">
+<dt id="seq_tables.seqtable.adjust_ref_seq">
+<code class="descname">adjust_ref_seq</code><span class="sig-paren">(</span><em>ref</em>, <em>table_columns</em>, <em>ref_start</em>, <em>return_as_np=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.adjust_ref_seq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.adjust_ref_seq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Aligns a reference sequence such that its position matches positions within the seqtable of interest</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ref</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; Represents the reference sequence</li>
+<li><strong>table_columns</strong> (<em>list or series</em>) &#8211; Defines the column positions or column names</li>
+<li><strong>ref_start</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Defines where the reference starts relative to the sequence</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="seq_tables.seqtable.compare_to_reference">
 <code class="descname">compare_to_reference</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>flip=False</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>return_num_bases=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.compare_to_reference"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.compare_to_reference" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate which positions within a reference are not equal in all sequences in dataframe</p>
@@ -366,7 +385,7 @@ i.e.  All qualities between positions 0-4 will be grouped together before perfor
 
 <dl class="method">
 <dt id="seq_tables.seqtable.get_seq_dist">
-<code class="descname">get_seq_dist</code><span class="sig-paren">(</span><em>positions=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.get_seq_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.get_seq_dist" title="Permalink to this definition">¶</a></dt>
+<code class="descname">get_seq_dist</code><span class="sig-paren">(</span><em>positions=None</em>, <em>method='counts'</em>, <em>ignore_characters=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.get_seq_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.get_seq_dist" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the distribution of bases or amino acids at each position.</p>
 </dd></dl>
 
@@ -389,6 +408,99 @@ i.e.  All qualities between positions 0-4 will be grouped together before perfor
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_TS_TV_profile">
+<code class="descname">mutation_TS_TV_profile</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_TS_TV_profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_TS_TV_profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the ratio of transition rates (A-&gt;G, C-&gt;T) to transversion rates (A-&gt;T/C) observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>ratio</strong> &#8211; TS Freq / TV Freq
+TS (float): TS Freq
+TV (float): TV Freq</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/library/functions.html#float" title="(in Python v2.7)">float</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_profile">
+<code class="descname">mutation_profile</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>normalized=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of mutation rates observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>normalized</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then frequency of each mutation</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>profile</strong> &#8211; Returns the counts (or frequency) for each mutation observed (i.e. A-&gt;C or A-&gt;T)</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">pd.Series</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="seq_tables.seqtable.mutation_profile_deprecated">
+<code class="descname">mutation_profile_deprecated</code><span class="sig-paren">(</span><em>reference_seq</em>, <em>positions=None</em>, <em>ref_start=0</em>, <em>set_diff=False</em>, <em>ignore_characters=[]</em>, <em>normalized=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/seq_tables.html#seqtable.mutation_profile_deprecated"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#seq_tables.seqtable.mutation_profile_deprecated" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of mutation rates observed between the reference sequence and sequences in table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>reference_seq</strong> (<a class="reference external" href="https://docs.python.org/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; A string that you want to align sequences to</li>
+<li><strong>positions</strong> (<em>list, default=None</em>) &#8211; specific positions in both the reference_seq and sequences you want to compare</li>
+<li><strong>ref_start</strong> (<em>int, default=0</em>) &#8211; where does the reference sequence start with respect to the aligned sequences</li>
+<li><strong>set_diff</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then we want to analyze positions that ARE NOT listed in positions parameters</li>
+<li><strong>normalized</strong> (<a class="reference external" href="https://docs.python.org/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, then frequency of each mutation</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><p><strong>profile</strong> &#8211; Returns the counts (or frequency) for each mutation observed (i.e. A-&gt;C or A-&gt;T)
+transversions (float): Returns frequency of transversion mutation
+transition (float): Returns frequency of transition mutation</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Transversion and transitions only apply to situations when the seqtype is a NT</p>
+</div>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">pd.Series</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This function has been deprecated because we found a better speed-optimized method</p>
+</div>
 </dd></dl>
 
 <dl class="method">
