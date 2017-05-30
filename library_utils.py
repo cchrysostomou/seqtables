@@ -1,5 +1,5 @@
 """
-**Set of random util methods for working with our NGS analysis scripts**
+**Set of random util methods for working with NGS analysis scripts**
 """
 
 import re
