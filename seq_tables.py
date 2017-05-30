@@ -8,16 +8,12 @@ import warnings
 import pandas as pd
 import math
 import numpy as np
-
-try:
-    from Bio import SeqIO
-    bio_installed = True
-except:
-    bio_installed = False
+import itertools
+from collections import defaultdict
 
 # from collections import defaultdict
-from seq_logo import draw_seqlogo_barplots
-from seq_table_util import get_quality_dist  # , degen_to_base, dna_alphabet, aa_alphabet
+from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, relative_entropy
+from .seq_table_util import get_quality_dist  # , degen_to_base, dna_alphabet, aa_alphabet
 
 
 def strseries_to_bytearray(series, fillvalue):
@@ -25,6 +21,49 @@ def strseries_to_bytearray(series, fillvalue):
     series = series.apply(lambda x: x.ljust(max_len, fillvalue))
     seq_as_int = np.array(list(series), dtype='S').view('S1').reshape((series.size, -1)).view('uint8')
     return (series, seq_as_int)
+
+
+def pandas_value_counts(df):
+    """
+    Simply apply the value_counts function to every column in a dataframe
+    """
+    return df.apply(pd.value_counts).fillna(0)
+
+
+def numpy_value_counts_bin_count(arr, weights=None):
+    """
+    Use the 'bin count' function in numpy to calculate the unique values in every column of a dataframe
+    clocked at about 3-4x faster than pandas_value_counts (df.apply(pd.value_counts))
+
+    Args:
+        arr (dataframe, or np array): Should represent rows as sequences and columns as positions. All values should be int
+        weights (np array): Should be a list of weights to place on each
+    """
+    if isinstance(arr, pd.DataFrame):
+        arr = arr.values
+    elif not isinstance(arr, np.ndarray):
+        raise Exception('The provided parameter for arr is not a dataframe or numpy array')
+    if len(arr.shape) == 1:
+        # its a ONE D array, lets make it two D
+        arr = arr.reshape(-1, 1)
+
+    bins = [np.bincount(arr[:, x], weights=weights) for x in range(arr.shape[1])]  # returns an array of length equal to the the max value in array + 1. each element represents number of times an integer appeared in array.
+    indices = [np.nonzero(x)[0] for x in bins]  # only look at non zero bins
+    series = [pd.Series(y[x], index=x) for (x, y) in zip(indices, bins)]
+    return pd.concat(series, axis=1).fillna(0)
+
+
+def custom_numpy_count(df, weights=None):
+    """
+    count all unique members in a numpy array and then using unique values, count occurrences at each position
+    This is by far the slowest method (seconds rather than tenths of seconds)
+    """
+    val = df.values
+    un = np.unique(val.reshape(-1))
+    if weights:
+        pass
+    r = {u: np.einsum('i, ij->j', weights, (val == u)) if weights is not None else np.einsum('ij->j', (val == u).astype(int)) for u in un}
+    return pd.DataFrame(r).transpose()
 
 
 class seqtable():
@@ -112,7 +151,7 @@ class seqtable():
         if template_qual is None and self.qual_table is not None:
             qual_table = self.qual_table.loc[template.index, template.columns]
         else:
-            qual_table = None
+            qual_table = template_qual
         if template_seqdf is None:
             self.slice_sequences(template.columns)
             seqs = self.slice_sequences(template.columns).loc[template.index]
@@ -157,6 +196,97 @@ class seqtable():
         else:
             random_qualities = None
         return seqtable(random_sequences['seqs'], random_qualities, self.start, index=random_sequences.index, seqtype=self.seqtype, phred_adjust=self.phred_adjust)
+
+    def get_substrings(self, word_length, subsample_seqs=None, weights=None):
+        """
+            Useful function for counting the occurrences of all possible SUBSTRINGs within a sequence table
+
+            Lets say we have the following sequences:
+            ACTW
+            ATTA
+
+            We want to get the occurrences of all combinations of substrings of length 3 in each sequence.
+            For example
+                1. we can have ACT, ACW, CTW, ATW in the first sequence
+                2. we can have ATT, ATA, TTA, ATA in the second sequence
+
+            Args:
+                word_length (int): the length of substrings
+                subsample_seqs (int): If provided, then will take only a random subsampling of the data before performing substring function
+
+            Returns:
+                dataframe: rows of dataframe are unique sequences of a given word length, Columns represents a specific combination of charcters in the word
+
+                    .. note::Dataframe format
+
+                        1. The number of columns should be equal to the total number of combinations (n choose k) where n = length of characters in seqtable, k = word_length
+                        2. The sum of all rows in the dataframe should be equal to the the total number of sequences passed into the function
+
+            Examples:
+                >>> import seq_tables
+                >>> st = seq_tables.seqtable(['ACTW', 'ATTA'])
+                >>> tmp = st.get_substrings(3)
+                Returns:
+                        (1, 2, 3) (1, 2, 4) (1, 3, 4) (2, 3, 4)
+                    ACT    1          0         0         0
+                    ACW    0          1         0         0
+                    CTW    0          0         0         1
+                    ATW    0          0         1         0
+                    ATA    0          1         1         0
+                    ATT    1          0         0         0
+                    TTA    0          0         0         1
+
+        """
+        def dict_count(arr):
+            dict_words = defaultdict(float)
+
+            def arr_fxn(a, b):
+                dict_words[a] += float(b)
+                return 0
+
+            assert(arr.shape[1] == 2)
+
+            np.apply_along_axis(lambda x: arr_fxn(x[0], x[1]), arr=arr, axis=1)
+            return dict_words
+
+        tmp_table = self.seq_table if subsample_seqs is None else self.subsample(subsample_seqs).seq_table
+        mapper = {c: i for i, c in enumerate(tmp_table.columns)}
+        rev_mapper = {i: c for i, c in enumerate(tmp_table.columns)}
+        substrings = [[mapper[x] for x in i] for i in itertools.combinations(list(tmp_table.columns), word_length)]
+        table_values = tmp_table.values.view('S1')
+        view_value = 'S' + str(word_length)
+
+        dataframes = []
+
+        if weights is None:
+            for s in substrings:
+                [a, b] = np.unique(table_values[:, s].reshape(-1).view(view_value), return_counts=True)
+                dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
+            return pd.concat(dataframes, axis=1).fillna(0)
+        else:
+            # for s in substrings:
+            #     arr_vals = np.concatenate([table_values[:, s].reshape(-1).view(view_value).reshape(-1, 1), weights.reshape(-1, 1)], axis=1)
+            #     arr_counts = dict_count(arr_vals)
+            #     dataframes.append(pd.DataFrame(arr_counts.values(), index=arr_counts.keys(), columns=[tuple([rev_mapper[c] for c in s])]))
+            for s in substrings:
+                arr = table_values[:, s].reshape(-1).view(view_value)
+                [a, b] = np.unique(arr, return_inverse=True)
+                c = numpy_value_counts_bin_count(b, weights=weights).reset_index().values
+                a = a[c[:, 0].astype(int)]
+                b = c[:, 1]
+                dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
+
+            return pd.concat(dataframes, axis=1).fillna(0)
+            # dfs = pd.concat([
+            #     pd.DataFrame(
+            #         {
+            #             'ss': table_values[:, s].reshape(-1).view(view_value),
+            #             tuple([rev_mapper[c] for c in s]): weights
+            #         }
+            #     )
+            #     for s in substrings
+            # ], axis=0).fillna(0)
+            # return dfs.groupby(by='ss').sum()
 
     def update_seqdf(self):
         """
@@ -218,7 +348,8 @@ class seqtable():
         """
         return self.seq_list
 
-    def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False, set_diff=False, ignore_characters=[], return_num_bases=False):
+    def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False,
+            set_diff=False, ignore_characters=[], treat_as_true=[], return_num_bases=False):
         """
             Calculate which positions within a reference are not equal in all sequences in dataframe
 
@@ -228,7 +359,13 @@ class seqtable():
                 ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
                 flip (bool): If True, then find bases that ARE MISMATCHES(NOT equal) to the reference
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
-                ignore_characters (char or list of chars): When performing distance/finding mismatches, always treat these characters as matches
+                ignore_characters (char or list of chars): When performing distance/finding mismatches, always IGNORE THESE CHARACTERS, DONT TREAT THEM AS A MATCH OR A MISMATCH
+
+                    ..important:: Change in datatype
+
+                        If turned on, then the datatype returned will be of FLOAT and not BOOL. This is because we cannot represent np.nan as a bool, it will alwasy be treated as true
+
+                treat_as_true (char or list of chars): When performing distance/finding mismatches, these BASES WILL ALWAYS BE TREATED AS TRUE/A MATCH
                 return_num_bases (bool): If true, returns a second argument defining the number of relevant bases present in each row
 
                     ..important:: Change in output results
@@ -238,24 +375,6 @@ class seqtable():
             Returns:
                 Dataframe of boolean variables showing whether base is equal to reference at each position
         """
-
-        # reference_seq = reference_seq.upper()
-        # compare_column_header = list(self.seq_table.columns)
-        # if ref_start < 0:
-        #     # simple: the reference sequence is too long, so just trim it
-        #     reference_seq = reference_seq[(-1 * ref_start):]
-        # elif ref_start > 0:
-        #     reference_seq = self.fillna_val * ref_start + reference_seq
-        #     # more complicated because we need to return results to user in the way they expected. What to do if the poisitions they requested are not
-        #     # found in reference sequence provided
-        #     if positions is None:
-        #         positions = compare_column_header
-        #     ignore_postions = compare_column_header[ref_start]
-        #     before_filter = positions
-        #     positions = [p for p in positions if p >= ref_start]
-        #     if len(positions) < len(before_filter):
-        #         warnings.warn("Warning: Because the reference starts at a position after the start of sequences we cannot anlayze the following positions: {0}".format(','.join([_ for _ in before_filter[:ref_start]])))
-        #     compare_column_header = compare_column_header[ref_start:]
 
         # convert reference to numbers
         # reference_array = np.array(bytearray(reference_seq))[ref_cols]
@@ -278,6 +397,21 @@ class seqtable():
         # actually compare distances in each letter (find positions which are equal)
         diffs = self.seq_table[positions].values == reference_array[ref_cols]  # if flip is False else self.seq_table[positions].values != reference_array
 
+        if treat_as_true:
+            if not isinstance(treat_as_true, list):
+                treat_as_true = [treat_as_true]
+            treat_as_true = [ord(let) for let in treat_as_true]
+            # now we have to ignore characters that are equal to specific values
+            ignore_pos = (self.seq_table[positions].values == treat_as_true[0]) | (reference_array[ref_cols] == treat_as_true[0])
+            for chr_p in range(1, len(treat_as_true)):
+                ignore_pos = ignore_pos | (self.seq_table[positions].values == treat_as_true[chr_p]) | (reference_array[ref_cols] == treat_as_true[chr_p])
+
+            # now adjust boolean results to ignore any positions == treat_as_true
+            diffs = (diffs | ignore_pos)  # if flip is False else (diffs | ignore_pos)
+
+        if flip:
+            diffs = ~diffs
+
         if ignore_characters:
             if not isinstance(ignore_characters, list):
                 ignore_characters = [ignore_characters]
@@ -287,20 +421,24 @@ class seqtable():
             for chr_p in range(1, len(ignore_characters)):
                 ignore_pos = ignore_pos | (self.seq_table[positions].values == ignore_characters[chr_p]) | (reference_array[ref_cols] == ignore_characters[chr_p])
 
-            # now adjust boolean results to ignore any positions == ignore_characters
-            diffs = (diffs | ignore_pos)  # if flip is False else (diffs | ignore_pos)
-
-        if flip:
-            diffs = ~diffs
+            # OK so we need to FORCE np.nan, we cant do that if the datatype is a bool, so unfortunately we need to change the dattype
+            # to be float in this situation
+            df = pd.DataFrame(diffs, index=self.seq_table.index, dtype=float, columns=positions)
+            df.values[ignore_pos] = np.nan
+        else:
+            # we will not need to replace nan anywhere, so we can use the smaller format of boolean here
+            df = pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions)
 
         if return_num_bases:
-            if ignore_characters:
-                num_bases = len(positions) - ignore_pos.sum(axis=1)
-            else:
-                num_bases = len(positions)
-            return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions), num_bases
+            #if ignore_characters:
+            #    num_bases = len(positions) - ignore_pos.sum(axis=1)
+            #else:
+            #    num_bases = len(positions)
+            num_bases = df.values.sum(axis=1)
+
+            return df, num_bases
         else:
-            return pd.DataFrame(diffs, index=self.seq_table.index, dtype=bool, columns=positions)
+            return df
 
     def hamming_distance(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized=False):
         """
@@ -320,7 +458,7 @@ class seqtable():
             diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
             return pd.Series(diffs.values.sum(axis=1), index=diffs.index)  # columns=c1, index=ind1)
 
-    def mutation_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], normalized=False):
+    def mutation_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], treat_as_true = [], normalized=False):
         """
             Return the type of mutation rates observed between the reference sequence and sequences in table.
 
@@ -330,14 +468,18 @@ class seqtable():
                 ref_start (int, default=0): where does the reference sequence start with respect to the aligned sequences
                 set_diff (bool): If True, then we want to analyze positions that ARE NOT listed in positions parameters
                 normalized (bool): If True, then frequency of each mutation
+                ignore_characters: (char or list of chars): When performing distance/finding mismatches, always IGNORE THESE CHARACTERS, DONT TREAT THEM AS A MATCH OR A MISMATCH
 
             Returns:
                 profile (pd.Series): Returns the counts (or frequency) for each mutation observed (i.e. A->C or A->T)
         """
         # def reference sequence
-        ref = pd.DataFrame(self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True, positions=positions)[0], index=self.seq_table.columns).rename(columns={0: 'Ref base'}).transpose()
+        ref = pd.DataFrame(
+            self.adjust_ref_seq(reference_seq, self.seq_table.columns, ref_start, return_as_np=True, positions=positions)[0],
+            index=self.seq_table.columns
+        ).rename(columns={0: 'Ref base'}).transpose()
         # compare all bases/residues to the reference seq (returns a dataframe of boolean vars)
-        not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
+        not_equal_to = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, treat_as_true=treat_as_true, set_diff=set_diff)
         # now create a numpy array in which the reference is repeated N times where n = # sequences
         ref = ref[not_equal_to.columns]
         ref_matrix = np.tile(ref, (self.seq_table.shape[0], 1))
@@ -361,11 +503,17 @@ class seqtable():
             return pd.Series()
         mut_index = pd.MultiIndex.from_tuples(list(unique_mut), names=['ref', 'mut'])
         mutation_counts = pd.Series(index=mut_index, data=counts).astype(float).sort_index()
-        if normalized is True:
-            mutation_counts = mutation_counts / (mutation_counts.sum())
+
         del ref_bases_unique
         del var_bases_unique
         del mutation_combos
+
+        if ignore_characters:
+            # drop any of these mutation types => maybe i dont need to remove from axis of 0 (the provided reference)??
+            mutation_counts = mutation_counts.unstack().drop(ignore_characters, axis=1, errors='ignore').drop(ignore_characters, axis=0, errors='ignore').stack()
+
+        if normalized is True:
+            mutation_counts = mutation_counts / (mutation_counts.sum())
 
         return mutation_counts
 
@@ -464,7 +612,7 @@ class seqtable():
         meself.seq_df = meself.seq_df.loc[meself.qual_table.index]
         # bases = meself.seq_table.shape[1]
 
-        self.shape = self.seq_table.shape
+
         if inplace is False:
             return meself
 
@@ -567,19 +715,48 @@ class seqtable():
 
         return substring
 
-    def get_seq_dist(self, positions=None, method='counts', ignore_characters=[],):
+    def get_seq_dist(self, positions=None, method='counts', ignore_characters=[], weight_by=None, ):
         """
             Returns the distribution of bases or amino acids at each position.
         """
+        if weight_by is not None:
+            try:
+                if isinstance(weight_by, pd.Series):
+                    assert(weight_by.shape[0] == self.seq_table.shape[0])
+                    weight_by = weight_by.values
+                elif isinstance(weight_by, pd.DataFrame):
+                    assert(weight_by.shape[0] == self.seq_table.shape[0])
+                    assert(weight_by.shape[1] == 1)
+                    weight_by = weight_by.values
+                else:
+                    assert(len(weight_by) == self.seq_table.shape[0])
+                    weight_by = np.array(weight_by)
+            except:
+                raise Exception('The provided weights for each seuence must match the number of input sequences!')
         compare = self.seq_table.loc[:, positions] if positions else self.seq_table
-        dist = compare.apply(pd.value_counts).fillna(0)
+
+        column_names = compare.columns
+        dist = numpy_value_counts_bin_count(compare, weight_by)   # compare.apply(pd.value_counts).fillna(0)
         dist.rename({c: chr(c) for c in list(dist.index)}, inplace=True)
         drop_values = list(set(ignore_characters) & set(list(dist.index)))
         dist = dist.drop(drop_values, axis=0)
         if method == 'freq':
             dist = dist.astype(float) / dist.sum(axis=0)
-
+        elif method == 'bits':
+            N = self.seq_table.shape[0]
+            dist = get_bits(dist.astype(float) / dist.sum(axis=0), self.seqtype, N)
+        dist.rename(columns={old: new for (old, new) in zip(dist.columns, column_names)}, inplace=True)
         return dist.fillna(0)
+
+    def get_plogo(self, background_seqs=None, positions=None, ignore_characters=[], alpha=0.01):
+        counts = self.get_seq_dist(positions, ignore_characters=ignore_characters)
+        if background_seqs is not None:
+            bkst = seqtable(background_seqs, seqtype=self.seqtype)
+            bkst_freq = bkst.get_seq_dist(positions, method='freq', ignore_characters=ignore_characters)
+        else:
+            bkst_freq = None
+
+        return get_plogo(counts, self.seqtype, bkst_freq, alpha=alpha)
 
     def get_consensus(self, positions=None, modecutoff=0.5):
         """
@@ -597,24 +774,40 @@ class seqtable():
         seq = dist.view('S' + str(chars))[0]
         return seq
 
-    def seq_logo(self, positions=None, method='freq', ignore_characters=[], **kwargs):
-        dist = self.get_seq_dist(positions, method, ignore_characters)
+    def pos_entropy(self, positions=None, ignore_characters=[], nbit=2):
+        dist = self.get_seq_dist(positions, method='freq', ignore_characters=ignore_characters)
+        return shannon_info(dist, nbit)
+
+    def relative_entropy(self, background_seqs=None, positions=None, ignore_characters=[]):
+        dist = self.get_seq_dist(positions, method='freq', ignore_characters=ignore_characters)
+        if background_seqs is not None:
+            bkst = seqtable(background_seqs, seqtype=self.seqtype)
+            bkst_freq = bkst.get_seq_dist(positions, 'freq', ignore_characters)
+        else:
+            bkst_freq = None
+        return relative_entropy(dist, self.seqtype, bkst_freq)
+
+    def seq_logo(self, positions=None, weights=None, method='freq', ignore_characters=[], **kwargs):
+        dist = self.get_seq_dist(positions, method, ignore_characters, weights)
         return draw_seqlogo_barplots(dist, alphabet=self.seqtype, **kwargs)
 
-    def get_quality_dist(self, bins=None, percentiles=[0.1, 0.25, 0.5, 0.75, 0.9], exclude_null_quality=True, sample=None):
+    def get_quality_dist(self, bins='fastqc', percentiles=[10, 25, 50, 75, 90], exclude_null_quality=True, sample=None, plotly_sampledata_size=20):
         """
             Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.
 
             Args:
-                bins(list of ints or tuples, default=None): bins defines how to group together the columns/sequence positions when aggregating the statistics.
+                bins(list of ints or tuples, or 'fastqc', or 'even'): bins defines how to group together the columns/sequence positions when aggregating the statistics.
 
-                    .. note:: bins=None
+                    .. note:: bins='fastqc' or 'even'
 
-                        If bins is none, then by default, bins are set to the same ranges defined by fastqc report
+                        if bins is not a set of numbers and instead one of the two predefined strings ('fastqc' and 'even') then calculation of bins will be defined as follows:
 
-                percentiles (list of floats, default=[0.1, 0.25, 0.5, 0.75, 0.9]): value passed into pandas describe() function.
+                                1. fastqc: Identical to the bin ranges used by fastqc report
+                                2. even: Creates 10 evenly sized bins based on sequence lengths
+
+                percentiles (list of floats, default=[10, 25, 50, 75, 90]): value passed into numpy percentiles function.
                 exclude_null_quality (boolean, default=True): do not include quality scores of 0 in the distribution
-                sample (int, default=None): If defined, then we will only calculate the distribution on a random subsampled population of sequences
+                sample (int, default=None): If defined, then we will only calculate the distribution on a random set of subsampled sequences
 
             Returns:
                 data (DataFrame): contains the distribution information at every bin (min value, max value, desired precentages and quartiles)
@@ -639,59 +832,8 @@ class seqtable():
                 # using outside of ipython
                 >>> plotly.plot(graphs)
         """
-        return get_quality_dist(self.qual_table, bins, percentiles, exclude_null_quality, sample)
-
-
-def read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=True, use_pandas=True):
-    """
-        Load a fastq file as class SeqTable
-    """
-    def group_fastq(index):
-        return index % 4
-    if use_pandas:
-        grouped = pd.read_csv(input_file, sep='\n', header=None).groupby(group_fastq)
-        header = list(grouped.get_group(0)[0].apply(lambda x: x[1:]))
-        seqs = list(grouped.get_group(1)[0])
-        quals = list(grouped.get_group(3)[0])
-    else:
-        if bio_installed is False:
-            raise Exception("You do not have BIOPYTHON installed and therefore must use pandas to read the fastq (set use_pandas parameter to True). If you would like to use biopython then please install")
-        seqs = []
-        quals = []
-        header = []
-        for seq in SeqIO.parse(input_file, 'fastq'):
-            r = seq.format('fastq').split('\n')
-            header.append(r[0])
-            seqs.append(r[1])
-            quals.append(r[3])
-    return seqtable(seqs, quals, index=header, seqtype='NT')
-
-
-def read_sam(input_file, limit=None, chunk_size=100000, cleave_softclip=False, use_header_as_index=True):
-    """
-        Load a SAM file into class SeqTable
-    """
-    skiplines = 0
-    with open(input_file) as r:
-        for i in r:
-            if i[0] == '@':
-                skiplines += 1
-            else:
-                break
-
-    cols_to_use = [9, 10]
-    if use_header_as_index:
-        cols_to_use.append(0)
-        index_col = 0
-    else:
-        index_col = None
-
-    if cleave_softclip:
-        cols_to_use.append(5)
-
-    df = pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines)
-    index = df.index
-    return seqtable(df[9], df[10], index, 'NT')
+        assert (self.qual_table is not None)
+        return get_quality_dist(self.qual_table, bins, percentiles, exclude_null_quality, sample, plotly_sampledata_size=20)
 
 
 class seqtable_indexer():

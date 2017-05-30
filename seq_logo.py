@@ -7,6 +7,10 @@ except:
     plotly_installed = False
     warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
 import math
+import numpy as np
+from scipy.stats import binom
+from collections import defaultdict
+import pandas as pd
 
 amino_acid_color_properties = defaultdict(lambda:
     {
@@ -123,7 +127,6 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
 
 
     """
-    warnings.warn('Currently only frequency logos are used, will allow for entropy in future')
     seq_dist = seq_dist.copy()
     if plotly_installed is False:
         warnings.warn('Cannot generate seq logo plots. Please install plotly')
@@ -157,7 +160,7 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
     for i in seq_dist.columns:
         top = 0
         l = False if cnt > 0 else True
-        for name, val in seq_dist.loc[:, i].sort_values().iteritems():
+        for name, val in seq_dist.loc[:, i].sort_values().items():
             top += val
             data.append(
                 go.Bar(
@@ -278,3 +281,153 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
         layout['bargap'] = bargap
     fig = go.Figure(data=data, layout=layout)
     return fig, data, layout
+
+
+def get_bits(distribution, seqtype, N):
+    alphabetN = 20 if seqtype == 'AA' else 4
+    error_correction = (1 / np.log(2)) * ((alphabetN - 1) / (2.0 * N))
+    total_height = np.log2(alphabetN) - (shannon_info(distribution, 2) + error_correction / 2)
+    residue_heights = (distribution * total_height)
+    residue_heights[residue_heights < 0] = 0
+    return residue_heights
+
+
+def shannon_info(distribution, nbit=2):
+    nbit = int(nbit)
+    base_change = np.log(nbit)
+    return -1 * (distribution * np.log(distribution) / base_change).sum()
+
+
+def relative_entropy(freq, seqtype, bkgrnd_freq=None):
+    if bkgrnd_freq is None:
+        bkgrnd_freq = unbiased_freq(seqtype, freq.index, freq.columns)
+    return (freq * np.log(freq.divide(bkgrnd_freq))).sum()
+
+
+def unbiased_freq(seqtype, index, columns):
+    constant = 1.0 / 20 if seqtype == 'AA' else 1.0 / 4
+    return pd.DataFrame(constant, index=index, columns=columns)
+
+
+def get_plogo(fg_counts, seqtype, bkgrnd_freq=None, use_cdf=True, use_ln=False, alpha=0.01):
+    """
+    Algorithm based on following:
+    O'Shea JP, Chou MF, Quader SA, Ryan JK, Church GM, & Schwartz D. (2013). pLogo: A probabilistic approach to visualizing sequence motifs. Nat Methods 10, 1211-1212
+    web-service: https://plogo.uconn.edu/
+
+    Args:
+            use_cdf (boolean): Dont perform the discrete solution where we calculate the binomial at every value up until k. instead use the CDF to estimate that value.
+
+                    This is very important when using the discrete solution takes a significant amount of time to compute the statistic because it has to loop through every possible value
+
+
+    """
+
+    def get_inf_log_odds(max_seq_count, null_freq):
+        """
+                Given the max seq_count and null_freq, attempt to find a "max probability" cut_off for the plogo
+
+        """
+        fudge_factor = 1.0
+        while True:
+            # If infinity, then K is too high for a valid statistic (answer rounds to 0, need to keep decrease K until we find a value we can handle)
+            K = max_seq_count / fudge_factor
+            if (K < 1):
+                print(max_seq_count, fudge_factor, null_freq)
+                raise "something unexpected happened for calculating upper bounds"
+            fill_inf = binomial_log_odds(K, max_seq_count, null_freq)
+            if (fill_inf != np.inf):
+                break
+            fudge_factor *= 10
+
+        if fill_inf == np.inf:
+            print(max_seq_count, fudge_factor, null_freq)
+            raise "Did not expect an infinity here"
+
+        if fudge_factor  == 1.0:
+            return fill_inf
+
+        # here comes ugly code, dont really need to get an exact number
+
+        for more_fudge in range(10, 1, -1):
+            K = (max_seq_count*more_fudge)/fudge_factor
+            fill_inf = binomial_log_odds(K, max_seq_count, null_freq)
+            if (fill_inf != np.inf):
+                break
+
+        for even_more_fudge in range(10, 1, -1):
+            K = (max_seq_count*(more_fudge + (1.0*even_more_fudge)/10))/fudge_factor
+            fill_inf = binomial_log_odds(K, max_seq_count, null_freq)
+            if (fill_inf != np.inf):
+                break
+
+        if fill_inf == np.inf:
+            print(max_seq_count, fudge_factor, null_freq, fill_inf)
+            # raise "Did not expect an infinity here"
+
+        return fill_inf
+
+    def binomial_log_odds(k, N, freq):
+
+        """
+            Discrete solution of probability using binomial should be calculated by:
+                above => Pr(k, k>=K, N, p) = sum[binomial(x, N, p) for x in range(k, N+1)] (sum all pmf from k to N)
+                below => Pr(k, k<=K, N, p) = sum[binomial(x, N, p) for x in range(0, k+1)] (sum all pmf from 0 to k)
+
+            This solution takes a very very long time if N and k are very high values (basically repeating binomial millions of time), so use CDF instead
+                above => binom.sf(k-1, N, p) => where sf is same as 1-cdf; and we are doing k-1 such that we include k in the sf function rather than exclude it as expected from a 1-cdf
+                below => binom.cdf(k, N, p)
+        """
+        if use_cdf is True:
+            # faster than looping for large k/N
+            above_k = binom.logsf(k-1, N, freq)
+            below_k = binom.logcdf(k, N, freq)
+        else:
+            above_k = np.log(sum([binom.pmf(x, N, freq) for x in range(int(k), int(N) + 1)]))
+            below_k = np.log(sum([binom.pmf(x, N, freq) for x in range(0, int(k) + 1)]))
+
+        log_odds = -1 * (above_k - below_k)
+        return log_odds * np.log10(np.exp(1)) if use_ln is False else log_odds
+
+    if bkgrnd_freq is None:
+        bkgrnd_freq = unbiased_freq(seqtype, fg_counts.index, fg_counts.columns)
+
+    # use these values to determin "max/min" possile values
+    null_freq = bkgrnd_freq[bkgrnd_freq > 0].min().min() / 100000.0
+
+    max_seq_count = fg_counts.sum().max()
+
+    fill_inf = get_inf_log_odds(max_seq_count, null_freq)
+
+    pos_res_heights = defaultdict(lambda: defaultdict(int))
+
+    for c in fg_counts.columns:
+        fg_col = fg_counts[c]
+        N = int(fg_col.sum())
+        # fg_col_lookup = defaultdict(int, dict(fg_col))
+        for let in list(fg_col.index):
+            p = bkgrnd_freq.loc[let, c]
+            k = fg_counts.loc[let, c]
+            res_height = binomial_log_odds(k, N, p)
+
+            # if res_height == np.inf:
+            #     res_height = fill_inf
+            # elif res_height == -1 * np.inf:
+            #     res_height = -1 * fill_inf
+            pos_res_heights[c][let] = res_height
+
+    plogo = pd.DataFrame(pos_res_heights)
+
+    max_val = plogo.stack().apply(abs).replace(np.inf, np.nan).dropna().max()
+
+    if (max_val > fill_inf):
+        warnings.warn('Warning, the predicted fill value is lower than the observed max value in table. Estimated fill value={0}, real data max={1}'.format(str(fill_inf), str(max_val)))
+        fill_inf = max_val
+
+    plogo[plogo==np.inf] = fill_inf
+    plogo[plogo==-1*np.inf] = -1 * fill_inf
+
+    combos = fg_counts.shape[0] * fg_counts.shape[1]
+    alpha_prime = alpha / (combos)
+    stat_sig = np.log10(alpha_prime / (1 - alpha_prime))
+    return plogo, stat_sig, -1 * stat_sig
