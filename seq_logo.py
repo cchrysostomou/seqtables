@@ -160,7 +160,7 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
     for i in seq_dist.columns:
         top = 0
         l = False if cnt > 0 else True
-        for name, val in seq_dist.loc[:, i].sort_values().items():
+        for name, val in seq_dist.loc[:, i].sort_values().iteritems():
             top += val
             data.append(
                 go.Bar(

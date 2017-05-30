@@ -2,6 +2,7 @@
 **We can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position
 and accessing specific positions of an aligned sequence**
 """
+
 import gc
 import copy
 import warnings
@@ -16,9 +17,12 @@ from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, 
 from .seq_table_util import get_quality_dist  # , degen_to_base, dna_alphabet, aa_alphabet
 
 
-def strseries_to_bytearray(series, fillvalue):
+def strseries_to_bytearray(series, fillvalue, use_encoded_value=True, encoding='utf-8'):
     max_len = series.apply(len).max()
-    series = series.apply(lambda x: x.ljust(max_len, fillvalue))
+    if use_encoded_value:
+        series = series.apply(lambda x: x.decode().ljust(max_len, fillvalue).encode(encoding))
+    else:
+        series = series.apply(lambda x: x.decode().ljust(max_len, fillvalue))
     seq_as_int = np.array(list(series), dtype='S').view('S1').reshape((series.size, -1)).view('uint8')
     return (series, seq_as_int)
 
@@ -83,6 +87,12 @@ class seqtable():
 
         seqtype (string of 'AA' or 'NT', default='NT'): Defines the format of the data being passed into the dataframe
         phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
+        encode_letters (bool, default=True):
+
+            If True, then strings will be encoded based on setting define din encoding (utf-8 encoding results is 1 byte representation per character rather than 4 bytes)
+            If False, then strings should be represented as str
+
+        encoding (str, default='utf-8'): If encode_letters is true, then this will encode strings using this setting
 
     Attributes:
         seq_df (Dataframe): Each row in the dataframe is a sequence. It will always contain a 'seqs' column representing the sequences past in. Optionally it will also contain a 'quals' column representing quality scores
@@ -94,7 +104,10 @@ class seqtable():
         >>> sq.hamming_distance('AAA')
         >>> sq = read_fastq('fastqfile.fq')
     """
-    def __init__(self, seqdata=None, qualitydata=None, start=1, index=None, seqtype='NT', phred_adjust=33, null_qual='!', **kwargs):
+    def __init__(
+        self, seqdata=None, qualitydata=None, start=1, index=None,
+        seqtype='NT', phred_adjust=33, null_qual='!', encode_letters=True, encoding='utf-8', **kwargs
+    ):
         self.null_qual = null_qual
         self.start = start
         if seqtype not in ['AA', 'NT']:
@@ -105,6 +118,7 @@ class seqtable():
         self.loc = seqtable_indexer(self, 'loc')
         self.iloc = seqtable_indexer(self, 'iloc')
         self.ix = seqtable_indexer(self, 'ix')
+        self.encoding_setting = (encode_letters, encoding)
         if seqdata is not None:
             self.index = index
             self._seq_to_table(seqdata)
@@ -262,7 +276,7 @@ class seqtable():
             for s in substrings:
                 [a, b] = np.unique(table_values[:, s].reshape(-1).view(view_value), return_counts=True)
                 dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
-            return pd.concat(dataframes, axis=1).fillna(0)
+            substring_counts_df =  pd.concat(dataframes, axis=1).fillna(0)
         else:
             # for s in substrings:
             #     arr_vals = np.concatenate([table_values[:, s].reshape(-1).view(view_value).reshape(-1, 1), weights.reshape(-1, 1)], axis=1)
@@ -276,7 +290,7 @@ class seqtable():
                 b = c[:, 1]
                 dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
 
-            return pd.concat(dataframes, axis=1).fillna(0)
+            substring_counts_df = pd.concat(dataframes, axis=1).fillna(0)
             # dfs = pd.concat([
             #     pd.DataFrame(
             #         {
@@ -287,6 +301,9 @@ class seqtable():
             #     for s in substrings
             # ], axis=0).fillna(0)
             # return dfs.groupby(by='ss').sum()
+        if self.encoding_setting[0] is False:
+            substring_counts_df.index = substring_counts_df.index.map(lambda x: x.decode())
+        return substring_counts_df
 
     def update_seqdf(self):
         """
@@ -309,11 +326,13 @@ class seqtable():
                 self.qual_table (Dataframe): each row corresponds to a specific sequence and each column corresponds to
 
         """
-        if isinstance(qualphred, list):
-            qual_list = pd.Series(qualphred)
-        else:
-            qual_list = qualphred
-        (qual_list, self.qual_table) = strseries_to_bytearray(qual_list, self.null_qual)
+        qual_list = pd.Series(qualphred, dtype='S')
+
+        (qual_list, self.qual_table) = strseries_to_bytearray(
+            qual_list, self.null_qual,
+            self.encoding_setting[0],
+            self.encoding_setting[1]
+        )
 
         self.seq_df['quals'] = list(qual_list)
         self.qual_table -= self.phred_adjust
@@ -332,12 +351,11 @@ class seqtable():
 
                 This function is not for public use
         """
-        if isinstance(seqlist, list):
-            seq_list = pd.Series(seqlist)
-        else:
-            seq_list = seqlist
-
-        (seq_list, self.seq_table) = strseries_to_bytearray(seq_list, self.fillna_val)
+        seq_list = pd.Series(seqlist, dtype='S')
+        (seq_list, self.seq_table) = strseries_to_bytearray(
+            seq_list, self.fillna_val,
+            self.encoding_setting[0], self.encoding_setting[1]
+        )
         self.seq_df = pd.DataFrame(list(seq_list), index=self.index, columns=['seqs'])
 
         self.seq_table = pd.DataFrame(self.seq_table, index=self.index, columns=range(self.start, self.seq_table.shape[1] + self.start))
@@ -348,8 +366,10 @@ class seqtable():
         """
         return self.seq_list
 
-    def compare_to_reference(self, reference_seq, positions=None, ref_start=0, flip=False,
-            set_diff=False, ignore_characters=[], treat_as_true=[], return_num_bases=False):
+    def compare_to_reference(
+            self, reference_seq, positions=None, ref_start=0, flip=False,
+            set_diff=False, ignore_characters=[], treat_as_true=[], return_num_bases=False
+    ):
         """
             Calculate which positions within a reference are not equal in all sequences in dataframe
 
@@ -434,8 +454,7 @@ class seqtable():
             #    num_bases = len(positions) - ignore_pos.sum(axis=1)
             #else:
             #    num_bases = len(positions)
-            num_bases = df.values.sum(axis=1)
-
+            num_bases = np.apply_along_axis(arr=df.values, axis=1, func1d=lambda x: len(x[~np.isnan(x)]))
             return df, num_bases
         else:
             return df
@@ -453,12 +472,12 @@ class seqtable():
         """
         if normalized is True:
             diffs, bases = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters, return_num_bases=True)
-            return pd.Series(diffs.values.sum(axis=1).astype(float) / bases, index=diffs.index)
+            return pd.Series(diffs.fillna(0).values.sum(axis=1).astype(float) / bases, index=diffs.index)
         else:
             diffs = self.compare_to_reference(reference_seq, positions, ref_start, flip=True, set_diff=set_diff, ignore_characters=ignore_characters)
-            return pd.Series(diffs.values.sum(axis=1), index=diffs.index)  # columns=c1, index=ind1)
+            return pd.Series(diffs.fillna(0).values.sum(axis=1), index=diffs.index)  # columns=c1, index=ind1)
 
-    def mutation_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], treat_as_true = [], normalized=False):
+    def mutation_profile(self, reference_seq, positions=None, ref_start=0, set_diff=False, ignore_characters=[], treat_as_true=[], normalized=False):
         """
             Return the type of mutation rates observed between the reference sequence and sequences in table.
 
@@ -486,18 +505,23 @@ class seqtable():
         # now create a numpy array of ALL bases in the seq table that were not equal to the reference
         subset = self.seq_table[not_equal_to.columns]
         var_bases_unique = subset.values[(not_equal_to.values)]
+
         # now create a corresponding numpy array of ALL bases in teh REF TABLE where that base was not equal in the seq table
         # each index in this variable corresponds to the index (seq #, base position) in var_bases_unique
         ref_bases_unique = ref_matrix[(not_equal_to.values)]
+
         # OK lets do some fancy numpy methods and merge the two arrays, and then convert the 2D into 1D using bit conversion
         # found this at: https://www.reddit.com/r/learnpython/comments/3v9y8u/how_can_i_find_unique_elements_along_one_axis_of/
         mutation_combos = np.array([ref_bases_unique, var_bases_unique]).T.copy().view(np.int16)
+
         # finally count the instances of each mutation we see (use squeeze(1) to ONLY squeeze single dim)
         counts = np.bincount(mutation_combos.squeeze(1))
         unique_mut = np.nonzero(counts)[0]
+
         counts = counts[unique_mut]
         # convert values back to chacters of format (REF BASE/RESIDUE, VAR base/residue)
-        unique_mut = unique_mut.astype(np.uint16).view(np.uint8).reshape(-1, 2).view('S1')
+        unique_mut = unique_mut.astype(np.uint16).view(np.uint8).reshape(-1, 2).view('S1').astype('U1')
+
         # unique_mut, counts = np.unique(mutation_combos.squeeze(), return_counts=True) => this could have worked also, little slower
         if len(unique_mut) == 0:
             return pd.Series()
@@ -611,7 +635,6 @@ class seqtable():
         meself.seq_table = meself.seq_table.loc[meself.qual_table.index]
         meself.seq_df = meself.seq_df.loc[meself.qual_table.index]
         # bases = meself.seq_table.shape[1]
-
 
         if inplace is False:
             return meself

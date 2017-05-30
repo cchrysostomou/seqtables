@@ -224,5 +224,5 @@ def get_quality_dist(
         )
         graphs.extend([scatter_min, scatter_max, scatter_mean])
 
-    return graphs, pd.DataFrame(binned_data), plotlychosendata
+    return graphs, pd.DataFrame(binned_data), plotlychosendata.transpose()
 

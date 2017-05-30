@@ -2,7 +2,7 @@ numexpr
 numpy
 cython
 jupyter
-pandas>0.2
+pandas>=0.2
 xarray
 matplotlib
 plotly

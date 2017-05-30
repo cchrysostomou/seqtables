@@ -27,7 +27,10 @@ def generate_sequence(seq_len=100, chars='ACTG', p_bases=[0.25, 0.25, 0.25, 0.25
     return str(np.random.choice(chars, (seq_len,), p=p_bases).astype('U1').view('U' + seq_len_str)[0])
 
 
-def generate_library(scaffold_seq, num_seqs, error_prone_rate=0, no_error_prone_pos=[], ss_pos=[], site_saturation={}, default_site_saturation='N', return_as='let'):
+def generate_library(
+    scaffold_seq, num_seqs, error_prone_rate=0, no_error_prone_pos=[], ss_pos=[],
+    site_saturation={}, default_site_saturation='N', return_as='seq'
+):
     """
     Create a fake library of DNA sequences using a scaffold sequence
 
@@ -110,7 +113,14 @@ def generate_library(scaffold_seq, num_seqs, error_prone_rate=0, no_error_prone_
     seq_list[:, ep_pos] = can_mutate
     del mutate_these_pos, can_mutate, new_bases
 
-    return seq_list
+    if return_as == 'seq':
+        # return full length sequence as an array
+        return seq_list.view('S' + str(seq_list.shape[1])).squeeze()
+    elif return_as == 'let':
+        # maintain view as a table of seq/pos
+        return seq_list
+    else:
+        raise Exception('Invalid option for return_as parameter. only allow "seq" or "let"')
 
 
 def add_quality_scores(
@@ -148,13 +158,14 @@ def add_quality_scores(
     # guess format of sequences provided
     if isinstance(sequence_list, list):
         sequence_list = np.array(sequence_list)
-    if sequence_list.shape[1] == 1:
+    if len(sequence_list.shape) == 1 or sequence_list.shape[1] == 1:
+        # len shape == 1 => does not have a 2nd dimension
         return_as = 'seqs'
         # assume they provided only sequences and not a matrix of sxb, so, will need to calculate sequences
-        max_seq_len = np.apply_along_axis(arr=sequence_list, func1d=len, axis=0).max()
+        max_seq_len = np.apply_along_axis(arr=sequence_list.reshape(-1, 1), func1d=lambda x: len(x[0]), axis=1).max()
     else:
-        return_as = 'bases'
-        # assume bases are represented by columns
+        return_as = 'let'
+        # assume let are represented by columns
         max_seq_len = sequence_list.shape[1]
 
     # create a normal distribution with mean 0, and std 1
@@ -204,7 +215,7 @@ def add_quality_scores(
 
     qualities = qualities.round().astype(np.uint8)
 
-    if return_as == 'bases':
+    if return_as == 'let':
         return (qualities + phred_adjust).view('S1')
     else:
         return (qualities + phred_adjust).view('S' + str(max_seq_len)).squeeze()
