@@ -219,3 +219,16 @@ def add_quality_scores(
         return (qualities + phred_adjust).view('S1')
     else:
         return (qualities + phred_adjust).view('S' + str(max_seq_len)).squeeze()
+
+
+def randomly_add_indels(
+    sequence_list, qual_list=None, insertion_rate=0.001, deletion_rate=0.1, expected_cons_ins = 1,
+):
+    lets = np.array(sequence_list).astype('S').view('S1')
+    delete_these_pos = np.random.choice([False, True], lets.shape, p=[1.0 - deletion_rate, deletion_rate]).ravel()
+    lets[delete_these_pos] = '-'
+    if qual_list:
+        quals = np.array(qual_list).astype('S').view('S1')
+        quals[delete_these_pos] = ' '
+    if insertion_rate:
+        pass

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.5, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="612px" height="792px" viewBox="0 0 612 792" enable-background="new 0 0 612 792" xml:space="preserve">
+<text transform="matrix(1 0 0 1 6.0005 85.7896)" font-family="'MyriadPro-Regular'" font-size="12">Read 1:         A  C   T  A  G  A   -    C  (Insertion with respect to reference @ pos 5) </text>
+<text transform="matrix(1 0 0 1 6.0005 101.0791)" font-family="'MyriadPro-Regular'" font-size="12">Read 2:         A  C  G  A  C   -    -    T</text>
+<text transform="matrix(1 0 0 1 6.0005 115.4126)" font-family="'MyriadPro-Regular'" font-size="12">Read 3:         A  C   T  A  G  A   T   C  (2 Insertions with respect to reference @ pos 5) </text>
+<text transform="matrix(1 0 0 1 3.0005 162.7896)" font-family="'MyriadPro-Regular'" font-size="12">Read 1:         30,25,10,15,20,5,,25      </text>
+<text transform="matrix(1 0 0 1 3.0005 178.0791)" font-family="'MyriadPro-Regular'" font-size="12">Read 2:         30, 21,19,25,30,,,18</text>
+<text transform="matrix(1 0 0 1 3.0005 149.1665)" font-family="'MyriadPro-Regular'" font-size="12">Position:       1   2  3  4   5             6</text>
+<text transform="matrix(1 0 0 1 3.0005 192.4126)" font-family="'MyriadPro-Regular'" font-size="12">Read 3:         15,20,25,30,35,15,18,27</text>
+<text transform="matrix(1 0 0 1 6.0005 72.833)" font-family="'MyriadPro-Bold'" font-size="12">Sequences/Reads/each base in a read</text>
+<text transform="matrix(1 0 0 1 3.0005 135.2891)" font-family="'MyriadPro-Bold'" font-size="12">Quality scores for each base</text>
+<text transform="matrix(1 0 0 1 6.0005 47.7891)" font-family="'MyriadPro-Regular'" font-size="12">Reference:   A  C   T  A  G   -   -    C</text>
+<text transform="matrix(1 0 0 1 6.0005 31.1665)" font-family="'MyriadPro-Regular'" font-size="12">Position:       1   2  3  4   5             6</text>
+<text transform="matrix(0.0104 -0.9999 0.9999 0.0104 63.9824 600.3916)" font-family="'MyriadPro-Regular'" font-size="12">Read</text>
+<text transform="matrix(1 0 0 1 152.0425 685.9609)" font-family="'MyriadPro-Regular'" font-size="12">Position</text>
+<rect x="68.391" y="503.428" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.666" height="168.5"/>
+<rect x="82.891" y="491.678" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.666" height="168.5"/>
+<text transform="matrix(1 0 0 1 71.7236 669.6777)" font-family="'MyriadPro-Regular'" font-size="12">Bases</text>
+<text transform="matrix(1 0 0 1 88.7236 656.6777)" font-family="'MyriadPro-Regular'" font-size="12">Quality scores</text>
+<text transform="matrix(1 0 0 1 0 248.1763)"><tspan x="0" y="0" font-family="'MyriadPro-Bold'" font-size="12">Representation 1:</tspan><tspan x="0" y="28.8" font-family="'MyriadPro-Regular'" font-size="12">Create two data arrays:</tspan><tspan x="0" y="43.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="43.2" font-family="'MyriadPro-Regular'" font-size="12">* One array to store all of the letters and quality scores of the reads,</tspan><tspan x="369.559" y="43.2" font-family="'MyriadPro-SemiboldIt'" font-size="12"> but leave out insertions</tspan><tspan x="0" y="57.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="57.6" font-family="'MyriadPro-Regular'" font-size="12">* Second array will keep track of location of insertions letters and quality scores </tspan><tspan x="0" y="86.4" font-family="'MyriadPro-Regular'" font-size="12">Benefits:</tspan><tspan x="0" y="100.8" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="100.8" font-family="'MyriadPro-Regular'" font-size="12">* Keep insertions as a seperate table accounts for the fact that it will be very sparse (very few reads and positions</tspan><tspan x="0" y="115.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="115.2" font-family="'MyriadPro-Regular'" font-size="12"> will have insertions)</tspan><tspan x="0" y="129.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="129.6" font-family="'MyriadPro-Regular'" font-size="12">* Quality scores are assocaited with each read in Array1</tspan><tspan x="0" y="158.4" font-family="'MyriadPro-Regular'" font-size="12">Cons:</tspan><tspan x="0" y="172.8" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="172.8" font-family="'MyriadPro-Regular'" font-size="12">* Will want to easily associate insertion locations with Array 1. Not sure if these types of merges would be effective/well designed for large datastructures</tspan><tspan x="0" y="187.201" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="187.201" font-family="'MyriadPro-Regular'" font-size="12">(i.e. in pandas, they dont perform too well with large sizes)</tspan><tspan x="0" y="201.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="201.6" font-family="'MyriadPro-Regular'" font-size="12">* </tspan><tspan x="43.524" y="201.6" font-family="'MyriadPro-SemiboldIt'" font-size="12">Quality score is optional, </tspan><tspan x="168.801" y="201.6" font-family="'MyriadPro-Regular'" font-size="12">so if no quality scores are provided, then would be doubling the size of the matrix with empty  data</tspan></text>
+<text transform="matrix(1 0 0 1 111.0576 484.7607)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Array 1: # reads x # positions x2 Matrix</text>
+<g>
+	<g>
+		<text transform="matrix(0.9995 0 0 1 382.3516 508.8789)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">R</tspan><tspan x="6.601" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="12.636" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">a</tspan><tspan x="18.66" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">d</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 429.6465 508.8789)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">P</tspan><tspan x="6.193" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="13.116" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">s</tspan><tspan x="17.845" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="20.569" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="24.528" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="27.252" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="34.176" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 480.9395 508.8789)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">I</tspan><tspan x="3.169" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan><tspan x="9.528" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">s</tspan><tspan x="14.257" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="20.292" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">r</tspan><tspan x="24.036" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="27.996" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="30.72" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="37.644" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 539.5684 508.8789)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">L</tspan><tspan x="5.952" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="11.986" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">tt</tspan><tspan x="19.906" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="25.943" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">r</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 589.1953 508.8789)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">Q</tspan><tspan x="8.197" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">u</tspan><tspan x="14.509" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">a</tspan><tspan x="20.532" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">li</tspan><tspan x="26.005" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="29.964" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">y</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 388.9941 533.2051)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 430.957 533.2051)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 483.584 533.2051)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 546.9023 531.2051)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">A</text>
+		<text transform="matrix(0.9995 0 0 1 594.8379 531.8721)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 388.9941 557.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">3</text>
+		<text transform="matrix(0.9995 0 0 1 430.957 557.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 483.584 557.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 546.2344 557.2129)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">A</text>
+		<text transform="matrix(0.9995 0 0 1 592.498 557.2129)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</tspan><tspan x="6.085" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 388.9941 581.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">3</text>
+		<text transform="matrix(0.9995 0 0 1 430.957 581.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 483.584 581.2207)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">2</text>
+		<text transform="matrix(0.9995 0 0 1 546.2344 580.5547)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">T</text>
+		<text transform="matrix(0.9995 0 0 1 593.1641 581.8877)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</tspan><tspan x="6.085" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">8</tspan></text>
+	</g>
+</g>
+<rect x="375.084" y="491.879" fill="none" stroke="#000000" stroke-width="0.9181" stroke-miterlimit="10" width="255" height="103"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="417.918" y1="491.879" x2="417.918" y2="594.879"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="476.084" y1="491.879" x2="476.084" y2="594.879"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="532.084" y1="491.879" x2="532.084" y2="594.879"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="581.75" y1="491.879" x2="581.75" y2="594.879"/>
+<text transform="matrix(1 0 0 1 429.6465 481.6279)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Array 2: (total insertion events x 5)</text>
+<text transform="matrix(1 0 0 1 3.001 10.165)" font-family="'MyriadPro-Bold'" font-size="12">Raw Data:</text>
+<text transform="matrix(0.0104 -0.9999 0.9999 0.0104 199.0151 1128.3799)" font-family="'MyriadPro-Regular'" font-size="12">Dim 2: Read</text>
+<text transform="matrix(1 0 0 1 277.0903 1210.166)" font-family="'MyriadPro-Regular'" font-size="12">Dim1: Position</text>
+<rect x="203.423" y="1022.082" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.667" height="168.5"/>
+<rect x="213.94" y="1010.333" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.667" height="168.499"/>
+<text transform="matrix(1 0 0 1 206.7563 1188.332)" font-family="'MyriadPro-Regular'" font-size="12">Bases</text>
+<text transform="matrix(1 0 0 1 215.9409 1175.832)" font-family="'MyriadPro-Regular'" font-size="12">1 Insertion after position</text>
+<text transform="matrix(1 0 0 1 6.001 750.3242)"><tspan x="0" y="0" font-family="'MyriadPro-Bold'" font-size="12">Representation 2:</tspan><tspan x="0" y="28.8" font-family="'MyriadPro-Regular'" font-size="12">Represent data as as single 4-D matrix</tspan><tspan x="0" y="43.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="43.2" font-family="'MyriadPro-Regular'" font-size="12">* Dim 1 = Coordinates represented by positions</tspan><tspan x="0" y="57.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="57.6" font-family="'MyriadPro-Regular'" font-size="12">* Dim 2 = Coordinates represented by reads</tspan><tspan x="0" y="72" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="72" font-family="'MyriadPro-Regular'" font-size="12">* Dim 3 = Coordinates represented by the maximum # of insertions observed within the entire set of </tspan><tspan x="0" y="86.4" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="86.4" font-family="'MyriadPro-Regular'" font-size="12">* Dim 4 = Coordinates = (base/letter, quality score)</tspan><tspan x="0" y="115.2" font-family="'MyriadPro-Regular'" font-size="12">Benefits:</tspan><tspan x="0" y="129.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="129.6" font-family="'MyriadPro-Regular'" font-size="12">*  Every aspect of aligned sequence are linked by reference position and read. So very easy to visualize results and perform operations.</tspan><tspan x="0" y="158.4" font-family="'MyriadPro-Regular'" font-size="12">Cons:</tspan><tspan x="0" y="172.8" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="172.8" font-family="'MyriadPro-Regular'" font-size="12">* Dimensions 3 and 4 can be very sparse and will create unnecessarily large data structures to represent the data. For example:</tspan><tspan x="0" y="187.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="187.2" font-family="'MyriadPro-Regular'" font-size="12">* Dont include quality scores, then size of matrix doubles with zeros in second coordinate of Dim 4</tspan><tspan x="0" y="201.6" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="201.6" font-family="'MyriadPro-Regular'" font-size="12">* Have a million reads and only one of those reads has 10 insertions, then have created 10 extra matrices of zeros to represent a single read only</tspan><tspan x="0" y="216" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan></text>
+<text transform="matrix(1 0 0 1 325.0566 982.4512)" font-family="'MyriadPro-SemiboldIt'" font-size="12">4-D Array</text>
+<rect x="226.257" y="997.667" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.667" height="168.499"/>
+<text transform="matrix(1 0 0 1 229.6079 1161.166)" font-family="'MyriadPro-Regular'" font-size="12">2 Insertions after position</text>
+<g>
+	<g>
+		<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="458.273" y1="1195" x2="483.039" y2="1165.771"/>
+		<g>
+			<path d="M486.94,1161.166c-1.032,2.848-1.938,6.698-1.897,9.596l-2.516-4.387l-4.74-1.762
+				C480.652,1164.178,484.301,1162.652,486.94,1161.166z"/>
+		</g>
+	</g>
+</g>
+<text transform="matrix(0.6061 -0.7954 0.7954 0.6061 469.3496 1205.709)"><tspan x="0" y="0" font-family="'MyriadPro-Regular'" font-size="12">Dim3:</tspan><tspan x="0" y="14.401" font-family="'MyriadPro-Regular'" font-size="12">Inserted base</tspan><tspan x="0" y="28.8" font-family="'MyriadPro-Regular'" font-size="12">after reference</tspan><tspan x="0" y="43.2" font-family="'MyriadPro-Regular'" font-size="12"> position</tspan></text>
+<text transform="matrix(1 0 0 1 302.9995 403.9668)" font-family="'MyriadPro-Regular'" font-size="12">https://ec2-54-202-54-138.us-west-2.compute.amazonaws.com:5501/notebooks/notebooksjupyter/Untitled1.ipynb?kernel_name=python2</text>
+<g>
+	<g>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="428.5,1044 428.5,1045.5 427,1045.5 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="2.7143,2.7143" x1="424.285" y1="1045.5" x2="409.357" y2="1045.5"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="408,1045.5 406.5,1045.5 406.5,1044 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3.1,3.1" x1="406.5" y1="1040.9" x2="406.5" y2="1030.05"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="406.5,1028.5 406.5,1027 408,1027 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="2.7143,2.7143" x1="410.715" y1="1027" x2="425.643" y2="1027"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="427,1027 428.5,1027 428.5,1028.5 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3.1,3.1" x1="428.5" y1="1031.6" x2="428.5" y2="1042.45"/>
+	</g>
+</g>
+<g>
+	<g>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="450.5,1044 450.5,1045.5 449,1045.5 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="2.7143,2.7143" x1="446.285" y1="1045.5" x2="431.357" y2="1045.5"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="430,1045.5 428.5,1045.5 428.5,1044 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3.1,3.1" x1="428.5" y1="1040.9" x2="428.5" y2="1030.05"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="428.5,1028.5 428.5,1027 430,1027 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="2.7143,2.7143" x1="432.715" y1="1027" x2="447.643" y2="1027"/>
+		<polyline fill="none" stroke="#000000" stroke-miterlimit="10" points="449,1027 450.5,1027 450.5,1028.5 		"/>
+		
+			<line fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3.1,3.1" x1="450.5" y1="1031.6" x2="450.5" y2="1042.45"/>
+	</g>
+</g>
+<text transform="matrix(1 0 0 1 384.166 1059.833)"><tspan x="0" y="0" font-family="'MyriadPro-Regular'" font-size="12">Dim 4: </tspan><tspan x="0" y="14.4" font-family="'MyriadPro-Regular'" font-size="12">base, quality</tspan></text>
+<text transform="matrix(1 0 0 1 412 1038.75)" font-family="'MyriadPro-Regular'" font-size="12">A</text>
+<text transform="matrix(1 0 0 1 434 1038.75)" font-family="'MyriadPro-Regular'" font-size="12">20</text>
+<text transform="matrix(1 0 0 1 105.0571 750.3242)" font-family="'MyriadPro-SemiboldIt'" font-size="12">4-D Array</text>
+<text transform="matrix(1 0 0 1 99.0566 248.1758)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Dataset of 1 Matrix table, and 1 insertion table/array</text>
+<text transform="matrix(1 0 0 1 455 611.9668)" font-family="'MyriadPro-Regular'" font-size="12">(MultiIndex)</text>
+<g>
+	<g>
+		<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="381.119" y1="600.391" x2="571.965" y2="600.391"/>
+		<g>
+			<path d="M375.084,600.391c2.84,1.055,6.363,2.852,8.547,4.756l-1.721-4.756l1.721-4.754
+				C381.447,597.541,377.924,599.338,375.084,600.391z"/>
+		</g>
+		<g>
+			<path d="M578,600.391c-2.84,1.055-6.363,2.852-8.547,4.756l1.719-4.756l-1.719-4.754C571.637,597.541,575.16,599.338,578,600.391
+				z"/>
+		</g>
+	</g>
+</g>
+<text transform="matrix(1 0 0 1 -10.8618 1271.9521)"><tspan x="0" y="0" font-family="'MyriadPro-Bold'" font-size="12">Representation 3:</tspan><tspan x="0" y="28.8" font-family="'MyriadPro-Regular'" font-size="12">Represent data as a dataset containing</tspan><tspan x="0" y="43.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="43.2" font-family="'MyriadPro-Regular'" font-size="12">* DataArray 1 =&gt; bases/letters of all non-inserted positions</tspan><tspan x="0" y="57.601" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="57.601" font-family="'MyriadPro-Regular'" font-size="12">* DataArray 2 =&gt; quality  scores of all non-inserted positions</tspan><tspan x="0" y="72" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="72" font-family="'MyriadPro-Regular'" font-size="12">* DataArray 3=&gt; Keep track of location of insertions letters and quality scores </tspan><tspan x="0" y="100.8" font-family="'MyriadPro-Regular'" font-size="12">Benefits:</tspan><tspan x="0" y="115.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="115.2" font-family="'MyriadPro-Regular'" font-size="12">*  Accounts for sparsity in DataArray2 and 3 (will not store data if user does not provide quality or insertions)</tspan><tspan x="0" y="144" font-family="'MyriadPro-Regular'" font-size="12">Cons:</tspan><tspan x="0" y="158.399" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan><tspan x="36" y="158.399" font-family="'MyriadPro-Regular'" font-size="12">* Harder for user to link together:</tspan><tspan x="0" y="172.8" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="172.8" font-family="'MyriadPro-Regular'" font-size="12">* Letters</tspan><tspan x="0" y="187.2" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="187.2" font-family="'MyriadPro-Regular'" font-size="12">* Quality scores</tspan><tspan x="0" y="201.601" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">		</tspan><tspan x="72" y="201.601" font-family="'MyriadPro-Regular'" font-size="12">* Insertions</tspan><tspan x="0" y="216" font-family="'MyriadPro-Regular'" font-size="12" letter-spacing="33">	</tspan></text>
+<text transform="matrix(1 0 0 1 88.1943 1271.9512)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Dataset of 2, 2-D arrays and 1 insertion table/array</text>
+<text transform="matrix(0.0104 -0.9999 0.9999 0.0104 -10.8618 1629.3193)" font-family="'MyriadPro-Regular'" font-size="12">Read</text>
+<text transform="matrix(1 0 0 1 88.7236 1714.8867)" font-family="'MyriadPro-Regular'" font-size="12">Position</text>
+<rect x="-6.454" y="1532.354" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.666" height="168.5"/>
+<text transform="matrix(1 0 0 1 92.8794 1629.3193)" font-family="'MyriadPro-Regular'" font-size="12">Bases</text>
+<text transform="matrix(1 0 0 1 40.2134 1524.0205)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Array 1: # reads x # positions </text>
+<g>
+	<g>
+		<text transform="matrix(0.9995 0 0 1 576.0234 1551.2715)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">R</tspan><tspan x="6.6" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="12.635" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">a</tspan><tspan x="18.66" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">d</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 623.3184 1551.2715)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">P</tspan><tspan x="6.193" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="13.116" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">s</tspan><tspan x="17.844" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="20.568" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="24.528" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="27.252" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="34.175" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 674.6113 1551.2715)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">I</tspan><tspan x="3.168" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan><tspan x="9.528" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">s</tspan><tspan x="14.256" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="20.291" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">r</tspan><tspan x="24.035" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="27.996" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">i</tspan><tspan x="30.72" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">o</tspan><tspan x="37.644" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">n</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 733.2393 1551.2715)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">L</tspan><tspan x="5.952" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="11.987" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">tt</tspan><tspan x="19.907" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">e</tspan><tspan x="25.943" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">r</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 782.8672 1551.2715)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">Q</tspan><tspan x="8.196" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">u</tspan><tspan x="14.508" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">a</tspan><tspan x="20.532" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">li</tspan><tspan x="26.004" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">t</tspan><tspan x="29.964" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">y</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 582.666 1575.5977)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 624.6279 1575.5977)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 677.2549 1575.5977)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 740.5732 1573.5977)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">A</text>
+		<text transform="matrix(0.9995 0 0 1 788.5098 1574.2646)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 582.666 1599.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">3</text>
+		<text transform="matrix(0.9995 0 0 1 624.6279 1599.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 677.2549 1599.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</text>
+		<text transform="matrix(0.9995 0 0 1 739.9063 1599.6055)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">A</text>
+		<text transform="matrix(0.9995 0 0 1 786.1699 1599.6055)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</tspan><tspan x="6.084" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</tspan></text>
+		<text transform="matrix(0.9995 0 0 1 582.666 1623.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">3</text>
+		<text transform="matrix(0.9995 0 0 1 624.6279 1623.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">5</text>
+		<text transform="matrix(0.9995 0 0 1 677.2549 1623.6133)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">2</text>
+		<text transform="matrix(0.9995 0 0 1 739.9063 1622.9473)" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">T</text>
+		<text transform="matrix(0.9995 0 0 1 786.8359 1624.2803)"><tspan x="0" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">1</tspan><tspan x="6.084" y="0" fill="#010101" font-family="'MyriadPro-Regular'" font-size="12">8</tspan></text>
+	</g>
+</g>
+<rect x="568.756" y="1534.271" fill="none" stroke="#000000" stroke-width="0.9181" stroke-miterlimit="10" width="255" height="103"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="611.59" y1="1534.271" x2="611.59" y2="1637.271"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="669.756" y1="1534.271" x2="669.756" y2="1637.271"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="725.756" y1="1534.271" x2="725.756" y2="1637.271"/>
+<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="775.422" y1="1534.271" x2="775.422" y2="1637.271"/>
+<text transform="matrix(1 0 0 1 623.3184 1524.0205)" font-family="'MyriadPro-SemiboldIt'" font-size="12">Array 3: (total insertion events x 5)</text>
+<text transform="matrix(1 0 0 1 648.6709 1654.3594)" font-family="'MyriadPro-Regular'" font-size="12">(MultiIndex)</text>
+<g>
+	<g>
+		<line fill="none" stroke="#000000" stroke-miterlimit="10" x1="574.791" y1="1642.783" x2="765.637" y2="1642.783"/>
+		<g>
+			<path d="M568.756,1642.783c2.84,1.055,6.363,2.852,8.547,4.756l-1.721-4.756l1.721-4.754
+				C575.119,1639.934,571.596,1641.73,568.756,1642.783z"/>
+		</g>
+		<g>
+			<path d="M771.672,1642.783c-2.84,1.055-6.363,2.852-8.547,4.756l1.719-4.756l-1.719-4.754
+				C765.309,1639.934,768.832,1641.73,771.672,1642.783z"/>
+		</g>
+	</g>
+</g>
+<rect x="263.661" y="1532.354" fill="none" stroke="#000000" stroke-miterlimit="10" width="250.666" height="168.5"/>
+<text transform="matrix(1 0 0 1 351.5898 1621.3545)" font-family="'MyriadPro-Regular'" font-size="12">Quality scores</text>
+<text transform="matrix(1 0 0 1 325.0566 1510.0215)"><tspan x="0" y="0" font-family="'MyriadPro-SemiboldIt'" font-size="12">Array 2:  # reads x # positions </tspan><tspan x="0" y="14.4" font-family="'MyriadPro-SemiboldIt'" font-size="12">IF PROVIDED (0x0 if empty)</tspan></text>
+<text transform="matrix(1 0 0 1 369.7236 1714.8867)" font-family="'MyriadPro-Regular'" font-size="12">Position</text>
+</svg>

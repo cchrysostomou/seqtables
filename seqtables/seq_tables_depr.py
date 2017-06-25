@@ -1,7 +1,9 @@
 """
-**We can use Pandas to analyze aligned sequences in a table. This can be useful for quickly generating AA or NT distribution by position
-and accessing specific positions of an aligned sequence**
+Using xarray to represent aligned sequences as a set of multidimensional tables
+
 """
+
+from __future__ import absolute_import
 
 import gc
 import copy
@@ -11,81 +13,46 @@ import math
 import numpy as np
 import itertools
 from collections import defaultdict
+import xarray as xr
 
 # from collections import defaultdict
 from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, relative_entropy
-from .seq_table_util import get_quality_dist  # , degen_to_base, dna_alphabet, aa_alphabet
+from .seq_table_util import get_quality_dist, dna_alphabet, aa_alphabet  # , degen_to_base, dna_alphabet, aa_alphabet
 
-
-def strseries_to_bytearray(series, fillvalue, use_encoded_value=True, encoding='utf-8'):
-    max_len = series.apply(len).max()
-    if use_encoded_value:
-        series = series.apply(lambda x: x.decode().ljust(max_len, fillvalue).encode(encoding))
-    else:
-        series = series.apply(lambda x: x.decode().ljust(max_len, fillvalue))
-    seq_as_int = np.array(list(series), dtype='S').view('S1').reshape((series.size, -1)).view('uint8')
-    return (series, seq_as_int)
-
-
-def pandas_value_counts(df):
-    """
-    Simply apply the value_counts function to every column in a dataframe
-    """
-    return df.apply(pd.value_counts).fillna(0)
-
-
-def numpy_value_counts_bin_count(arr, weights=None):
-    """
-    Use the 'bin count' function in numpy to calculate the unique values in every column of a dataframe
-    clocked at about 3-4x faster than pandas_value_counts (df.apply(pd.value_counts))
-
-    Args:
-        arr (dataframe, or np array): Should represent rows as sequences and columns as positions. All values should be int
-        weights (np array): Should be a list of weights to place on each
-    """
-    if isinstance(arr, pd.DataFrame):
-        arr = arr.values
-    elif not isinstance(arr, np.ndarray):
-        raise Exception('The provided parameter for arr is not a dataframe or numpy array')
-    if len(arr.shape) == 1:
-        # its a ONE D array, lets make it two D
-        arr = arr.reshape(-1, 1)
-
-    bins = [np.bincount(arr[:, x], weights=weights) for x in range(arr.shape[1])]  # returns an array of length equal to the the max value in array + 1. each element represents number of times an integer appeared in array.
-    indices = [np.nonzero(x)[0] for x in bins]  # only look at non zero bins
-    series = [pd.Series(y[x], index=x) for (x, y) in zip(indices, bins)]
-    return pd.concat(series, axis=1).fillna(0)
-
-
-def custom_numpy_count(df, weights=None):
-    """
-    count all unique members in a numpy array and then using unique values, count occurrences at each position
-    This is by far the slowest method (seconds rather than tenths of seconds)
-    """
-    val = df.values
-    un = np.unique(val.reshape(-1))
-    if weights:
-        pass
-    r = {u: np.einsum('i, ij->j', weights, (val == u)) if weights is not None else np.einsum('ij->j', (val == u).astype(int)) for u in un}
-    return pd.DataFrame(r).transpose()
+from .utils.operations import strseries_to_bytearray
+from .utils.unique_ops import numpy_value_counts_bin_count
 
 
 class seqtable():
     """
-    Class for viewing aligned sequences within a list or dataframe. This will take a list of sequences and create views such that
-    we can access each position within specific positions. It will also associate quality scores for each base if provided.
+    Class for viewing aligned sets of DNA or AA sequences. This will take in a list of sequences that are presumed to be aligned to one another, and
+    convert the sequences into an xarray dataset (sets of numpy arrays). In additiona to the sequence, quality scores for each base can be provided in addition to sequences.
+
+    The xarray dataset will be structured as follows:
+        xr.DataSet({
+            'reference_table': Represents a data-array of bases in each that reads that contains (deletions are allowed) to the reference sequence of interest
+            'insertions': Represents a data-array of bases in each read that only includes insertions for each read with respect to the reference sequence of interest
+        })
+
 
     Args:
         seqdata (Series, or list of strings): List containing a set of sequences aligned to one another
         qualitydata (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)
-        start (int): Explicitly define where the aligned sequences start with respect to some refernce frame (i.e. start > 2 means sequences start at position 2 not 1)
+        reference_positions (int, list, array, series, dict): Explicitly define where the aligned sequences start with respect to some reference frame (i.e. start > 2 means sequences start at position 2 not 1)
+
+            .. note:: dict
+
+                If reference_positions is dict, then it assumes a unique set of coordinates for each reference
+
+
+
         index (list of values defining the index, default=None):
 
             .. note::Index=None
 
                 If None, then the index will result in default integer indexing by pandas.
 
-        seqtype (string of 'AA' or 'NT', default='NT'): Defines the format of the data being passed into the dataframe
+        seq_type (string of 'AA' or 'NT', default='NT'): Defines the format of the data being passed into the dataframe
         phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
         encode_letters (bool, default=True):
 
@@ -105,26 +72,90 @@ class seqtable():
         >>> sq = read_fastq('fastqfile.fq')
     """
     def __init__(
-        self, seqdata=None, qualitydata=None, start=1, index=None,
-        seqtype='NT', phred_adjust=33, null_qual='!', encode_letters=True, encoding='utf-8', **kwargs
+        self, seq_data=None, quality_data=None, seq_position_values=1, index=None,
+        seq_type=None, phred_adjust=33, null_qual='!', encode_letters=True  # , encoding='utf-8'  # , **kwargs
     ):
+        assert seq_data is not None, "The default seqdata value is not allowed, you must provide sequences"
         self.null_qual = null_qual
-        self.start = start
-        if seqtype not in ['AA', 'NT']:
-            raise Exception('You defined seqtype as, {0}. We only allow seqtype to be "AA" or "NT"'.format(seqtype))
-        self.seqtype = seqtype
+        if seq_type is None:
+            # attempt to guess the sequence type
+            check_sequences = min(len(seq_data), 1000)
+            if isinstance(seq_data, list):
+                sub_seq = ''.join(seq_data[:check_sequences])
+            else:
+                try:
+                    sub_seq = ''.join(list(seq_data.iloc[:check_sequences]))
+                except:
+                    raise Exception("Error: cannot determine seq_type given the provided seqdata. Either manually define the sequence type or provide seq data as a list")
+            unique_letters = set(list(sub_seq.lower()))
+            if len(unique_letters - set(list('actgn'))) == 0:
+                # the first set of sequences had only actgn letters so we assume its a nucleotide sequence
+                self.seq_type = 'NT'
+            elif len(unique_letters - set(dna_alphabet)) == 0:
+                # the first set of sequences have ACTGN letters and also letters that could refer to DEGENERATE bases. Or they could be a constricted set of AA residues so we arent sure, but default to nucleotide
+                warnings.warn('The provided sequences appear to only have letters pertaining to DNA and degenerage DNA bases. So we are assuming that the provided sequences are DNA sequences. If this is incorrect, please manually define the seq_type when initializing the sequence table or change its sequence type via `change_seq_type` function')
+                self.seq_type == 'NT'
+            elif len(unique_letters - set(aa_alphabet)) == 0:
+                # the first set of sequences have letters that only correspond to AA residues
+                self.seq_type = 'AA'
+            else:
+                # the first set of sequences have letters that arent part of both DNA and AA values, so default to AA
+                warnings.warn('The provided sequences appear to have letters outside the known/expected AA and NT nomenclature. The sequence type will be defaulted to AA sequences. If this is incorrect, please manually define the seq_type when initializing the sequence table or change its sequence type via `change_seq_type` function')
+                self.seq_type = 'AA'
+        elif seq_type not in ['AA', 'NT']:
+            raise Exception('You defined seq_type as, {0}. We only allow seq_type to be "AA" or "NT"'.format(seq_type))
+        else:
+            # user appropriately defined the type of sequences in the list
+            self.seq_type = seq_type
+
+        # subtract ascii values of quality scores by this # (for example when phred_adjust = 33, then ! means quality score of 0)
         self.phred_adjust = phred_adjust
-        self.fillna_val = 'N' if seqtype == 'NT' else 'X'
-        self.loc = seqtable_indexer(self, 'loc')
-        self.iloc = seqtable_indexer(self, 'iloc')
-        self.ix = seqtable_indexer(self, 'ix')
-        self.encoding_setting = (encode_letters, encoding)
-        if seqdata is not None:
-            self.index = index
-            self._seq_to_table(seqdata)
-            self.qual_table = None
-            if (isinstance(qualitydata, pd.Series) and qualitydata.empty is False) or qualitydata is not None:
-                self.qual_to_table(qualitydata, phred_adjust, return_table=False)
+
+        self.fillna_val = 'N' if self.seq_type == 'NT' else 'X'
+
+        self.encoding_setting = (encode_letters, 'utf-8')
+
+        self._seq_to_table(seq_data)
+        self._qual_to_table(quality_data, phred_adjust, return_table=False, nullshape=self.seq_arr.shape)
+        self.contains_quality = self.qual_arr.shape[0] > 0
+
+
+        # self.contains_quality = not(qualitydata is None)
+        # self.seq_df = pd.DataFrame({'seqs': seqs, 'quals': qualitydata}) if qualitydata else pd.DataFrame({'seqs': seqs, 'quals': ''})
+
+        # if isinstance(pos_names, int) or isinstance(pos_names, float):
+        #     pos_names = np.arange(int(pos_names), int(pos_names) + st.shape[1])
+        # elif pos_names is None:
+        #     pos_names = np.arange(1, 1 + st.shape[1])
+        # else:
+        #     assert len(pos_names) == st.shape[1], 'ERROR the provided sequences and the provided position names are not the same size/shape!'
+        #     pos_names = [p for p in pos_names]
+
+        # d3array = (np.dstack((st.T, qualtable.T)).T).astype(np.uint8)
+        # super(SeqPanel, self).__init__(d3array, items=['seqs', 'quals'], minor_axis=pos_names, major_axis=index)
+
+        # self.seq_table = self.loc['seqs']
+        # self.qual_table = self.loc['quals']
+
+
+
+        # self.null_qual = null_qual
+        # self.start = start
+        # if seqtype not in ['AA', 'NT']:
+        #     raise Exception('You defined seqtype as, {0}. We only allow seqtype to be "AA" or "NT"'.format(seqtype))
+        # self.seqtype = seqtype
+        # self.phred_adjust = phred_adjust
+        # self.fillna_val = 'N' if seqtype == 'NT' else 'X'
+        # self.loc = seqtable_indexer(self, 'loc')
+        # self.iloc = seqtable_indexer(self, 'iloc')
+        # self.ix = seqtable_indexer(self, 'ix')
+        # self.encoding_setting = encode_letters  # (encode_letters, encoding)
+        # if seqdata is not None:
+        #     self.index = index
+        #     self._seq_to_table(seqdata)
+        #     self.qual_table = None
+        #     if (isinstance(qualitydata, pd.Series) and qualitydata.empty is False) or qualitydata is not None:
+        #         self.qual_to_table(qualitydata, phred_adjust, return_table=False)
 
     def __len__(self):
         return self.seq_list.shape[0]
@@ -161,7 +192,7 @@ class seqtable():
         return self.copy_using_template(seq_table)
 
     def copy_using_template(self, template, template_seqdf=None, template_qual=None):
-        new_member = seqtable(seqtype=self.seqtype, phred_adjust=self.phred_adjust, null_qual=self.null_qual)
+        new_member = seqtable(seq_type=self.seq_type, phred_adjust=self.phred_adjust, null_qual=self.null_qual)
         if template_qual is None and self.qual_table is not None:
             qual_table = self.qual_table.loc[template.index, template.columns]
         else:
@@ -209,7 +240,7 @@ class seqtable():
             random_qualities = random_sequences['quals']
         else:
             random_qualities = None
-        return seqtable(random_sequences['seqs'], random_qualities, self.start, index=random_sequences.index, seqtype=self.seqtype, phred_adjust=self.phred_adjust)
+        return seqtable(random_sequences['seqs'], random_qualities, self.start, index=random_sequences.index, seq_type=self.seq_type, phred_adjust=self.phred_adjust)
 
     def get_substrings(self, word_length, subsample_seqs=None, weights=None):
         """
@@ -313,12 +344,12 @@ class seqtable():
         """
         self.seq_df = self.slice_sequences(self.seq_table.columns)
 
-    def qual_to_table(self, qualphred, phred_adjust=33, return_table=False):
+    def _qual_to_table(self, quals, phred_adjust=33, return_table=False, nullshape=(0, 0)):
         """
             Given a set of quality score strings, updates the  return a new dataframe such that each column represents the quality at each position as a number
 
             Args:
-                qualphred: (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)
+                quals: (Series or list of quality scores, default=None): If defined, then user is passing in quality data along with the sequences)
                 phred_adjust (integer, default=33): If quality data is passed, then this will be used to adjust the quality score (i.e. Sanger vs older NGS quality scorning)
                 return_table (boolean, default=False): If True, then the attribute self.qual_table is returned
 
@@ -326,22 +357,28 @@ class seqtable():
                 self.qual_table (Dataframe): each row corresponds to a specific sequence and each column corresponds to
 
         """
-        qual_list = pd.Series(qualphred, dtype='S')
+        if quals is None:
+            # no quality scores
+            self.qual_arr = np.array([]).reshape(*nullshape)
+            return
 
-        (qual_list, self.qual_table) = strseries_to_bytearray(
-            qual_list, self.null_qual,
-            self.encoding_setting[0],
-            self.encoding_setting[1]
+        if hasattr(quals, 'values'):
+            # its probably a dataframe/series
+            # gotcha assumptions??? probably...
+            quals = np.array(quals.values, dtype='S')
+        else:
+            quals = np.array(quals, dtype='S')
+
+        self.qual_arr = strseries_to_bytearray(
+            quals, self.null_qual,
+            self.encoding_setting
         )
 
-        self.seq_df['quals'] = list(qual_list)
-        self.qual_table -= self.phred_adjust
-
-        self.qual_table = pd.DataFrame(self.qual_table, index=self.index, columns=range(self.start, self.qual_table.shape[1] + self.start))
-
-        if self.qual_table.shape != self.seq_table.shape:
-            raise Exception("The provided quality list does not match the format of the sequence list. Shape of sequences {0}, shape of quality {1}".format(str(self.seq_table.shape), str(self.qual_table.shape)))
-        return self.qual_table
+        assert self.qual_arr.shape == self.seq_arr.shape, \
+            'Error the shape of the quality scores does not match the shape of the sequence scores: seq shape: {0}, qual shape {1}'.format(
+                self.seq_arr.shape,
+                self.qual_arr.shape
+            )
 
     def _seq_to_table(self, seqlist):
         """
@@ -351,20 +388,23 @@ class seqtable():
 
                 This function is not for public use
         """
-        seq_list = pd.Series(seqlist, dtype='S')
-        (seq_list, self.seq_table) = strseries_to_bytearray(
-            seq_list, self.fillna_val,
-            self.encoding_setting[0], self.encoding_setting[1]
-        )
-        self.seq_df = pd.DataFrame(list(seq_list), index=self.index, columns=['seqs'])
+        if hasattr(seqlist, 'values'):
+            # its probably a dataframe/series
+            # gotcha assumptions??? probably...
+            seqlist = np.array(seqlist.values, dtype='S')
+        else:
+            seq_list = np.array(seqlist, dtype='S')
 
-        self.seq_table = pd.DataFrame(self.seq_table, index=self.index, columns=range(self.start, self.seq_table.shape[1] + self.start))
+        self.seq_arr = strseries_to_bytearray(
+            seq_list, self.fillna_val,
+            self.encoding_setting
+        )
 
     def table_to_seq(self, new_name):
         """
             Return the sequence list
         """
-        return self.seq_list
+        raise 'NEED TO FIX!!!'
 
     def compare_to_reference(
             self, reference_seq, positions=None, ref_start=0, flip=False,
@@ -556,8 +596,8 @@ class seqtable():
                 TS (float): TS Freq
                 TV (float): TV Freq
         """
-        if self.seqtype != 'NT':
-            raise('Error: you cannot calculate TS and TV mutations on AA sequences. Either the seqtype is incorrect or you want to use the function mutation_profile')
+        if self.seq_type != 'NT':
+            raise('Error: you cannot calculate TS and TV mutations on AA sequences. Either the seq_type is incorrect or you want to use the function mutation_profile')
         transitions = [('A', 'G'), ('G', 'A'), ('C', 'T'), ('T', 'C')]
         transversions = [
             ('A', 'C'), ('C', 'A'), ('A', 'T'), ('T', 'A'),
@@ -590,7 +630,7 @@ class seqtable():
 
                 .. note::
 
-                        Transversion and transitions only apply to situations when the seqtype is a NT
+                        Transversion and transitions only apply to situations when the seq_type is a NT
             .. note::
 
                 This function has been deprecated because we found a better speed-optimized method
@@ -652,7 +692,7 @@ class seqtable():
             raise Exception("You have not passed in any quality data for these sequences")
 
         meself = self if inplace is True else self.copy()
-        replace_with = ord(replace_with) if replace_with is not None else ord('N') if self.seqtype == 'NT' else ord('X')
+        replace_with = ord(replace_with) if replace_with is not None else ord('N') if self.seq_type == 'NT' else ord('X')
         meself.seq_table.values[meself.qual_table.values < q] = replace_with
         chars = self.seq_table.shape[1]
         meself.seq_df['seqs'] = list(meself.seq_table.values.copy().view('S' + str(chars)).ravel())
@@ -767,19 +807,19 @@ class seqtable():
             dist = dist.astype(float) / dist.sum(axis=0)
         elif method == 'bits':
             N = self.seq_table.shape[0]
-            dist = get_bits(dist.astype(float) / dist.sum(axis=0), self.seqtype, N)
+            dist = get_bits(dist.astype(float) / dist.sum(axis=0), self.seq_type, N)
         dist.rename(columns={old: new for (old, new) in zip(dist.columns, column_names)}, inplace=True)
         return dist.fillna(0)
 
     def get_plogo(self, background_seqs=None, positions=None, ignore_characters=[], alpha=0.01):
         counts = self.get_seq_dist(positions, ignore_characters=ignore_characters)
         if background_seqs is not None:
-            bkst = seqtable(background_seqs, seqtype=self.seqtype)
+            bkst = seqtable(background_seqs, seq_type=self.seq_type)
             bkst_freq = bkst.get_seq_dist(positions, method='freq', ignore_characters=ignore_characters)
         else:
             bkst_freq = None
 
-        return get_plogo(counts, self.seqtype, bkst_freq, alpha=alpha)
+        return get_plogo(counts, self.seq_type, bkst_freq, alpha=alpha)
 
     def get_consensus(self, positions=None, modecutoff=0.5):
         """
@@ -804,15 +844,15 @@ class seqtable():
     def relative_entropy(self, background_seqs=None, positions=None, ignore_characters=[]):
         dist = self.get_seq_dist(positions, method='freq', ignore_characters=ignore_characters)
         if background_seqs is not None:
-            bkst = seqtable(background_seqs, seqtype=self.seqtype)
+            bkst = seqtable(background_seqs, seq_type=self.seq_type)
             bkst_freq = bkst.get_seq_dist(positions, 'freq', ignore_characters)
         else:
             bkst_freq = None
-        return relative_entropy(dist, self.seqtype, bkst_freq)
+        return relative_entropy(dist, self.seq_type, bkst_freq)
 
     def seq_logo(self, positions=None, weights=None, method='freq', ignore_characters=[], **kwargs):
         dist = self.get_seq_dist(positions, method, ignore_characters, weights)
-        return draw_seqlogo_barplots(dist, alphabet=self.seqtype, **kwargs)
+        return draw_seqlogo_barplots(dist, alphabet=self.seq_type, **kwargs)
 
     def get_quality_dist(self, bins='fastqc', percentiles=[10, 25, 50, 75, 90], exclude_null_quality=True, sample=None, plotly_sampledata_size=20):
         """
