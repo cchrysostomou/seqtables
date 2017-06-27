@@ -222,13 +222,79 @@ def add_quality_scores(
 
 
 def randomly_add_indels(
-    sequence_list, qual_list=None, insertion_rate=0.001, deletion_rate=0.1, expected_cons_ins = 1,
+    sequence_list, qual_list=None, insertion_rate=0.001, deletion_rate=0.01, expected_cons_ins=1, max_ins=10,
+    avg_ins_qual=20, ins_qual_std=3
 ):
+
     lets = np.array(sequence_list).astype('S').view('S1')
+    num_seqs = len(sequence_list)
+    lets[lets == ''.encode()] = '-'
     delete_these_pos = np.random.choice([False, True], lets.shape, p=[1.0 - deletion_rate, deletion_rate]).ravel()
     lets[delete_these_pos] = '-'
-    if qual_list:
+
+    if not(qual_list is None):
         quals = np.array(qual_list).astype('S').view('S1')
-        quals[delete_these_pos] = ' '
+        quals[delete_these_pos] = '-'
+
     if insertion_rate:
-        pass
+        assert avg_ins_qual < 45, 'Error average ins quality should be less than 45'
+        ins_these_pos = np.random.choice([False, True], lets.shape, p=[1.0 - insertion_rate, insertion_rate]).ravel()
+        total_ins = ins_these_pos.sum()
+        num_ins_per_pos = np.random.poisson(expected_cons_ins, total_ins)
+        num_ins_per_pos[num_ins_per_pos == 0] = 1
+        max_ins_observed = num_ins_per_pos.max() + 1
+        total_letters_to_create = num_ins_per_pos.sum()
+        new_lets = np.random.choice(list('ACTG'), total_letters_to_create).astype('U{0}'.format(max_ins_observed))
+        new_quals = (np.round(np.random.normal(avg_ins_qual, ins_qual_std, total_letters_to_create)).astype(np.uint8))
+        new_quals[new_quals < 0] = 0
+        new_quals[new_quals > 45] = 45
+        new_quals = (new_quals + 33).view('S1').astype('U{0}'.format(max_ins_observed))
+
+        lets = lets.astype('U{0}'.format(max_ins_observed))
+
+        lets_inserted_at_pos = np.split(new_lets, num_ins_per_pos.cumsum()[:-1])
+        quals_inserted_at_pos = np.split(new_quals, num_ins_per_pos.cumsum()[:-1])
+
+        lets[ins_these_pos] = np.array(
+            [
+                a + ''.join(b) for a, b in zip(
+                    lets[ins_these_pos], lets_inserted_at_pos
+                )
+            ]
+        )
+
+        if not(qual_list is None):
+            quals = quals.astype('U{0}'.format(max_ins_observed))
+            quals[ins_these_pos] = np.array(
+                [
+                    a + ''.join(b) for a, b in zip(
+                        quals[ins_these_pos], quals_inserted_at_pos
+                    )
+                ]
+            )
+
+    new_seqs = np.apply_along_axis(
+        arr=lets.reshape(num_seqs, -1),
+        axis=1,
+        func1d=lambda x: ''.join(list(x)).replace('-', '')
+    )
+
+    if qual_list is None:
+        return new_seqs,
+    else:
+        new_quals = np.apply_along_axis(
+            arr=quals.reshape(num_seqs, -1),
+            axis=1,
+            func1d=lambda x: ''.join(list(x)).replace('-', '')
+        )
+
+        return new_seqs, new_quals
+
+
+
+
+
+
+
+
+
