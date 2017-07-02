@@ -182,4 +182,3 @@ def _seqs_to_datarray(
         prefix + 'quality_table': qual_xr,
         prefix + 'insertion_table': [],
     }, attrs
-
