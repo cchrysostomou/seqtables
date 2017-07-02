@@ -44,4 +44,5 @@ groupby(ref, cigar, pos):
 
 
 
-
+fastqdata to seqtable => 20 ms per 10K, 2 seconds for 1 million reads
+breakdown cigar: 120ms per 10k, 12 seconds for 1 million reads
