@@ -234,7 +234,8 @@ def randomly_add_indels(
 
     if not(qual_list is None):
         quals = np.array(qual_list).astype('S').view('S1')
-        quals[delete_these_pos] = '-'
+        # add EMPTY qualitys for deleted bases (ascii value = 32)
+        quals[delete_these_pos] = ' '
 
     if insertion_rate:
         assert avg_ins_qual < 45, 'Error average ins quality should be less than 45'
@@ -285,7 +286,7 @@ def randomly_add_indels(
         new_quals = np.apply_along_axis(
             arr=quals.reshape(num_seqs, -1),
             axis=1,
-            func1d=lambda x: ''.join(list(x)).replace('-', '')
+            func1d=lambda x: ''.join(list(x)).replace(' ', '')
         )
 
         return new_seqs, new_quals

@@ -33,14 +33,22 @@ def build_reference(input_fasta, ref_name, ref_path=None):
 			os.makedirs(ref_path)
 		ref_name = os.path.join(ref_path, os.path.basename(ref_name))
 
-	execute_call = ' '.join([os.path.join(bowtie_path, "bowtie2-build"), '"' + input_fasta + '"', '"' + ref_name + '"', ' --quiet'])
-	process_worked = subprocess.call(
-		execute_call,
-		stderr=subprocess.STDOUT,
-		shell=True
-	)
-	if process_worked > 0:
+	execute_call = [os.path.join(bowtie_path, "bowtie2-build"), "'{0}'".format(input_fasta), "'{0}'"..format(ref_name), ' --quiet']
+
+	proc = Popen(execute_call, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	message, err = proc.communicate()
+
+	# process_worked = subprocess.call(
+	# 	execute_call,
+	# 	stderr=subprocess.STDOUT,
+	# 	shell=True
+	# )
+
+	if proc.returncode > 0:  #  process_worked > 0:
+		print('The following error was returned: ')
+		print(err)
 		raise Exception('Something went wrong when building the database')
+
 	return os.path.join(os.path.dirname(input_fasta), ref_name)
 
 
@@ -111,22 +119,6 @@ def bowtie2(fastq_files, references, paired_seqs, sam_file_name, bowtie_ref_name
 	# run bowtie-build commandd
 	ref = build_reference(fastaname, bowtie_ref_name, output_ref_dir)
 
-	# ### OLD CODE ####
-	# command = '-x "{0}" -1 "{1}" -2 "{2}"'.format(ref, os.path.abspath(fastq_files[0]), os.path.abspath(fastq_files[1])) if paired_seqs else '-x "{0}" -U {1}'.format(ref, ','.join([os.path.abspath(f).replace(' ', '\ ') for f in fastq_files]))
-	# command += ' -S "{0}"'.format(os.path.abspath(os.path.join(working_directory, sam_file_name)))
-	# extra_commands = '--threads {0}'.format(str(threads)) if threads else ''
-
-	# for o in options:
-		# if isinstance(o, tuple):
-		# 	extra_commands += ' {0} {1}'.format(o[0], str(o[1])) if o[1] != '' else ' {0}'.format(o[0])
-		# else:
-		# 	extra_commands += ' ' + o
-
-	# execute_call = ' '.join([os.path.join(bowtie_path, "bowtie2"), extra_commands, command])
-	# print(execute_call)
-	# ### END OF OLD CODE ######
-
-	# make it as a list of commands to use "shell=False", note, to use shell=false, executable location must be a single element in list
 	# https://jimmyg.org/blog/2009/working-with-python-subprocess.html
 	command_list = [os.path.join(bowtie_path, "bowtie2")]
 	# add in user provided options
@@ -152,9 +144,7 @@ def bowtie2(fastq_files, references, paired_seqs, sam_file_name, bowtie_ref_name
 	command_list = [str(c) for c in command_list]
 
 	# RUN subprocess
-	print(' '.join(command_list))
 	proc = Popen(command_list, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	# for some reason, both stdout and stderr is being merged into err. maybe this is bowtie specific?
 	message, err = proc.communicate()
 
 	if proc.returncode > 0:
@@ -217,4 +207,4 @@ if __name__ == "__main__":
 		('--no-mixed')
 	]
 	# bowtie2(['testme/small_r1.fastq', 'testme/small_r2.fastq'], refs, True, 'out.sam', sys.argv[1] + '.ref', options=options, threads=4)
-	remove_phix_sequences(['testme/small_r1.fastq', 'testme/small_r2.fastq'], result_prefix='testme/stuff_goes_here')
+	# remove_phix_sequences(['testme/small_r1.fastq', 'testme/small_r2.fastq'], result_prefix='testme/stuff_goes_here')
