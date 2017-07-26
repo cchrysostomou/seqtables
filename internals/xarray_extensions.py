@@ -3,7 +3,6 @@ import numpy as np
 import warnings
 import pandas as pd
 
-
 @xr.register_dataset_accessor('st')
 class SeqTablesAccessor(object):
     def __init__(self, xarray_obj):
@@ -21,6 +20,9 @@ class SeqTablesAccessor(object):
                 self.default_ref = list(st_attrs['references'].keys())[0]
         else:
             self.default_ref = st_attrs['default_ref']
+
+    def merge(self, objects):
+        pass
 
     def adjust_ref_seq(self, ref, table_columns, ref_start, positions, return_as_np=True):
         """

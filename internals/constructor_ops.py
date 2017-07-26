@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 import warnings
 from collections import defaultdict
 from ..utils.seq_table_util import dna_alphabet, aa_alphabet
+from .sam_to_arr import df_to_algn_arr
 
 
 def strseries_to_bytearray(series, fillvalue='N', use_encoded_value=True):
@@ -69,16 +71,145 @@ def list_to_arr(values):
         return np.array(values, dtype='S')
 
 
-def _seq_df_to_dataarray(
-    df,
-    map_cols={'ref': 'rname', 'seqs': 'seqs', 'quals': 'quals', 'cigar': 'cigar'},
-    ref_pos_names={}
+def seq_df_to_datarray(
+    df, seq_type, index,
+    map_cols={'ref': 'rname', 'seqs': 'seq', 'quals': 'qual', 'cigar': 'cigar', 'pos': 'pos'},
+    ref_pos_names={},
+    ignore_ref_col=False,
+    ref_name='',
+    ref_to_pos_dict = {}
 ):
     """
 
     """
-    ref_pos_names = defaultdict(ref_pos_names, [])
+    ref_pos_names = defaultdict(list, ref_pos_names)
+
     assert 'seqs' in map_cols, 'Error you must provide the column name for sequences'
+
+    if 'cigar' not in map_cols:
+        # no need to do any alignment, juse use seq to dtarr func
+        return _seqs_to_datarray(
+            df[map_cols['seqs']].values,
+            df[map_cols['quals']].values if 'quals' in map_cols else None,
+            pos=df[map_cols['pos']].values if 'pos' in map_cols else 1,
+            index=list(index)
+        )
+
+    return _algn_seq_to_datarray(
+        ref_name,
+        seq_type,
+        phred_adjust=33,
+        data=[
+            df[map_cols['seqs']].values,
+            df[map_cols['quals']].values if 'quals' in map_cols else np.array([]),
+            df[map_cols['pos']].values,
+            df[map_cols['cigar']].values,
+            np.array(list(index))
+        ],
+        ref_to_pos_dim=ref_to_pos_dict[ref_name] if ref_name in ref_to_pos_dict else None
+    )
+
+
+def _algn_seq_to_datarray(
+    ref_name, seq_type, phred_adjust, data, ref_to_pos_dim=None
+):
+    if data[-1] is None:
+        index = np.array([])
+    elif isinstance(data[-1], list):
+        index = np.array(data[-1])
+    else:
+        index = data[-1]
+
+    # add in gaps and remove indels in cython fnc
+
+    aligned_arrs = df_to_algn_arr(*data, edge_gap=ord('$'))  # , edgeGap='$')
+
+    has_quality = data[1].shape[0] > 0
+
+    seq_arr = aligned_arrs[0].astype('S1')
+    index = data[-1]
+    if len(data) == 0:
+        has_quality = False
+        qual_arr = np.array([]).reshape(*(0, 0))
+    else:
+        qual_arr = aligned_arrs[1].view(np.int8) - 33
+
+    prefix = ref_name + '.' if ref_name else ''
+    position_dim = prefix + 'position' if ref_to_pos_dim is None else ref_to_pos_dim
+    pos_arr = aligned_arrs[2]
+
+    seq_xr = xr.DataArray(
+        seq_arr,
+        dims=[prefix + 'read', position_dim],
+        coords={
+            position_dim: pos_arr,
+            prefix + 'read': index if index.shape[0] > 0 else np.range(1, 1 + seq_arr.shape[0])
+        }
+    )
+
+    if has_quality:
+        qual_xr = xr.DataArray(
+            qual_arr,
+            dims=[prefix + 'read', position_dim],
+            coords={
+                position_dim: pos_arr,
+                prefix + 'read': index if index.shape[0] > 0 else np.range(1, 1 + qual_arr.shape[0])
+            }
+        )
+    else:
+        qual_xr = xr.DataArray(np.array([]).reshape(*(0, 0)))
+
+    fillna_val = 'N' if seq_type == 'NT' else 'X'
+
+    inserted_base_index = pd.MultiIndex.from_tuples(
+        aligned_arrs[3],
+        names=(
+            'insertions.{0}{2}{1}'.format(prefix, 'read', '.' if not prefix else ''),
+            'insertions.{0}{1}refpos'.format(prefix, '.' if not prefix else ''),  # base position with respect to reference
+            'insertions.{0}{1}inspos'.format(prefix, '.' if not prefix else '')  # specific position of insertion
+        )
+    )
+
+    insertions = xr.DataArray(
+        aligned_arrs[4],
+        coords={
+            prefix + 'insertion_table_pos_data': inserted_base_index,
+            'insertion_data': (['letter', 'quality'])
+        },
+        dims=[prefix + 'insertion_table_pos_data', 'insertion_data']
+    )
+
+    metadata = {
+        'seq_type': seq_type,
+        'fillna_val': fillna_val,
+        'has_quality': has_quality,
+        'references': {
+            ref_name: {
+                'dimension_names': {
+                    'position': position_dim,
+                    'read': prefix + 'read',
+                    'insertion_positions': prefix + 'insertion_table_pos_data',
+                    'insertion_positions_multiindex': inserted_base_index.names
+                },
+                'table_names': {
+                    'seq': prefix + 'sequence_table',
+                    'qual': prefix + 'quality_table',
+                    'ins':  prefix + 'insertion_table'
+                }
+            }
+        },
+        'phred_adjust': phred_adjust
+    }
+
+    attrs = {
+        'seqtable': metadata
+    }
+
+    return {
+        prefix + 'sequence_table': seq_xr,
+        prefix + 'quality_table': qual_xr,
+        prefix + 'insertion_table': insertions,
+    }, attrs
 
 
 def _seqs_to_datarray(
