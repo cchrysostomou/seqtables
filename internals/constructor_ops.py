@@ -114,7 +114,7 @@ def _algn_seq_to_datarray(
     ref_name, seq_type, phred_adjust, data, ref_to_pos_dim=None
 ):
     if data[-1] is None:
-        index = np.array([])
+        index = np.arange(data[0].shape[0]) # np.array([])
     elif isinstance(data[-1], list):
         index = np.array(data[-1])
     else:
@@ -134,16 +134,17 @@ def _algn_seq_to_datarray(
     else:
         qual_arr = aligned_arrs[1].view(np.int8) - 33
 
-    prefix = ref_name + '.' if ref_name else ''
+    prefix = ref_name + '_' if ref_name else ''
     position_dim = prefix + 'position' if ref_to_pos_dim is None else ref_to_pos_dim
     pos_arr = aligned_arrs[2]
+    # print(aligned_arrs[3])
 
     seq_xr = xr.DataArray(
         seq_arr,
         dims=[prefix + 'read', position_dim],
         coords={
             position_dim: pos_arr,
-            prefix + 'read': index if index.shape[0] > 0 else np.range(1, 1 + seq_arr.shape[0])
+            prefix + 'read': aligned_arrs[5] # index if index.shape[0] > 0 else np.range(1, 1 + seq_arr.shape[0])
         }
     )
 
@@ -153,7 +154,7 @@ def _algn_seq_to_datarray(
             dims=[prefix + 'read', position_dim],
             coords={
                 position_dim: pos_arr,
-                prefix + 'read': index if index.shape[0] > 0 else np.range(1, 1 + qual_arr.shape[0])
+                prefix + 'read': aligned_arrs[5] # index if index.shape[0] > 0 else np.range(1, 1 + qual_arr.shape[0])
             }
         )
     else:
@@ -164,9 +165,9 @@ def _algn_seq_to_datarray(
     inserted_base_index = pd.MultiIndex.from_tuples(
         aligned_arrs[3],
         names=(
-            'insertions.{0}{2}{1}'.format(prefix, 'read', '.' if not prefix else ''),
-            'insertions.{0}{1}refpos'.format(prefix, '.' if not prefix else ''),  # base position with respect to reference
-            'insertions.{0}{1}inspos'.format(prefix, '.' if not prefix else '')  # specific position of insertion
+            'insertions_{0}{2}{1}'.format(prefix, 'read', '_' if not prefix else ''),
+            'insertions_{0}{1}refpos'.format(prefix, '_' if not prefix else ''),  # base position with respect to reference
+            'insertions_{0}{1}inspos'.format(prefix, '_' if not prefix else '')  # specific position of insertion
         )
     )
 
@@ -258,7 +259,7 @@ def _seqs_to_datarray(
         has_quality = False
         qual_arr = np.array([]).reshape(*(0, 0))
 
-    prefix = ref_name + '.' if ref_name else ''
+    prefix = ref_name + '_' if ref_name else ''
 
     # create dimensions
     if isinstance(pos, int):

@@ -7,6 +7,20 @@ import regex
 
 
 def breakdown_bits(flag, asstring=True):
+    """
+    1 0x1 template having multiple segments in sequencing
+    2 0x2 each segment properly aligned according to the aligner
+    4 0x4 segment unmapped
+    8 0x8 next segment in the template unmapped
+    16 0x10 SEQ being reverse complemented
+    32 0x20 SEQ of the next segment in the template being reverse complemented
+    64 0x40 the first segment in the template
+    128 0x80 the last segment in the template
+    256 0x100 secondary alignment
+    512 0x200 not passing filters, such as platform/vendor quality controls
+    1024 0x400 PCR or optical duplicate
+    2048 0x800 supplementary alignment
+    """
     if flag == 0:
         return [] if asstring is True else ''
     flags = [n for n in range(int(np.log2(flag)) + 1) if flag & (1 << n)]

@@ -70,7 +70,8 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     while charNum < strLen:
         tmpEv = cigarstring[charNum]
         if((tmpEv < zero) | (tmpEv > nine)):
-            tmpNum = atoi(cigarstring[charNumStart + 1:charNum])
+            # its not a number, but a letter that defines the cigar string (i.e. M in 235M)
+            tmpNum = atoi(cigarstring[charNumStart + 1:charNum])  # determine number of events using substring preceding letter
             tempEventCounts[matching_pos] = tmpNum
             charNumStart = charNum
             if tmpEv == 'I':
@@ -200,8 +201,8 @@ cdef void extract_algn_seq(
             print('DIDNT FIX THIS!!')
             pass
         else:
-            print('Unexpected error!!')
-            raise 'Unexpected error'
+            print('Unexpected error/event!!', evt)
+            raise Exception()
 
     # print(refP, max_pos)
     if refP <= max_pos:
@@ -247,7 +248,7 @@ cpdef df_to_algn_arr(
     char edge_gap = '-'
 ):
     cdef Py_ssize_t nSeq = seqs.shape[0], ind
-    cdef int pI
+    cdef int pI, passedSeq=0, insCounter=0, tmpInsPosMarker;
     cdef char **seqR = <char**>malloc(4 * sizeof(char*))
     cdef int **insPosInfo = <int**>malloc(1 * sizeof(int*))
     cdef char* tmp
@@ -258,7 +259,7 @@ cpdef df_to_algn_arr(
 
     cdef regex_result *match_vec = <regex_result*>malloc(nSeq * sizeof(regex_result))
     cdef int maxPosStore = 0, tmpPosStore = 0, minPosStore = pos[0]
-    cdef multiindex_val = [], insData = []
+    cdef multiindex_val = [], insData = [], successfullIndexes = []
 
     for ind in range(nSeq):
         match_vec[ind] = cigar_breakdown(cigars[ind].encode(), len(cigars[ind]))
@@ -277,6 +278,8 @@ cpdef df_to_algn_arr(
         max_pos = maxPosStore
 
     for ind in range(nSeq):
+        if (cigars[ind][0] == '*' and len(cigars[ind]) == 1):
+            continue
         extract_algn_seq(
              seqs[ind].encode(),
              quals[ind].encode(),
@@ -291,6 +294,8 @@ cpdef df_to_algn_arr(
              edge_gap
         )
 
+        successfullIndexes.append(indexes[ind])
+
         free(match_vec[ind].eventLengths)
         free(match_vec[ind].eventTypes)
 
@@ -302,17 +307,36 @@ cpdef df_to_algn_arr(
             seqR[1][:currIndArr[0]]
         )
 
-        for pI in range(currIndArr[1]):
-            multiindex_val.append(
-                (indexes[ind], insPosInfo[0][pI], pI + 1)
-            )
+        if (currIndArr[1] > 0):
+            # add insertion information
+            insCounter = 0  # starst at 0, but will be changed to 1 in else statement below
 
-            insData.append(
-                [
-                    seqR[2][pI:pI + 1], seqR[3][pI:pI+1]
-                ]
-            )
+            # tmpInsPosMarker = insPosInfo[0][0]  # = > use this if we define insertions as directly TO THE RIGHT of a base
+            # for pI in range(currIndArr[1]):  # = > use this if we define insertions as directly TO THE RIGHT of a base
+            tmpInsPosMarker = insPosInfo[0][currIndArr[1] - 1]  # => use this if we define insertins as directly TO THE LEFT OF A BASE
+            for pI in range(currIndArr[1] - 1, -1, -1):
+                if (insPosInfo[0][pI] != tmpInsPosMarker):
+                    # we are in a new position with respect to reference so update position
+                    # insCounter = 1  # = > use this if we define insertions as directly TO THE RIGHT of a base
+                    insCounter = -1
+                    tmpInsPosMarker = insPosInfo[0][pI]
+                else:
+                    # change reference position with regard to where insertions occur at a position
+                    # insCounter += 1  # = > use this if we define insertions as directly TO THE RIGHT of a base
+                    insCounter -= 1
+                multiindex_val.append(
+                    # USE (-) VALUES BECAUSE WE WILL DEFINE INSERTIONS AS TO THE LEFT(!!!) OF THE BASE POSITION (i.e. -> A[CGG]TAA AND CGG REPRESENTS INSERTIONS AT BASE POSITION 2 (REPRESENTED BY T))
+                    (indexes[ind], insPosInfo[0][pI], insCounter)
+                    # IF WE WANTED TO DEFINE FROM RIGHT OR BASE POSITION THEN USE THE FOLLOWING???
+                    # (indexes[ind], insPosInfo[0][pI] - 1, insCounter)
+                )
 
+                insData.append(
+                    [
+                        seqR[2][pI:pI + 1], seqR[3][pI:pI+1]
+                    ]
+                )
+        passedSeq += 1
         free(seqR[0])
         free(seqR[1])
         free(seqR[2])
@@ -321,14 +345,15 @@ cpdef df_to_algn_arr(
     free(match_vec)
     free(seqR)
 
-    seq_table = np.array(seqList, dtype='S').view('S1').reshape(nSeq, -1)
-    qual_table = np.array(qualList, dtype='S').view('S1').reshape(nSeq, -1)
+    seq_table = np.array(seqList, dtype='S').view('S1').reshape(passedSeq, -1)
+    qual_table = np.array(qualList, dtype='S').view('S1').reshape(passedSeq, -1)
     positions = np.arange(min_pos, max_pos + 1)
 
     return seq_table, qual_table, \
             positions, \
             multiindex_val, \
-            np.array(insData, dtype='S').view('S1').reshape(len(insData), -1) if insData else np.array(insData)
+            np.array(insData, dtype='S').view('S1').reshape(len(insData), -1) if insData else np.array(insData), \
+            successfullIndexes
 
 
 cpdef test_cpy(char *s):
