@@ -1,4 +1,4 @@
-from ..seqtables import seq_tables
+from ..core import seqtables
 import pandas as pd
 from ..__init__ import bio_installed, SeqIO
 import gc

@@ -1,4 +1,4 @@
-gumexpr
+numexpr
 numpy
 cython
 jupyter

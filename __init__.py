@@ -4,3 +4,5 @@ try:
 except:
     SeqIO = False
     bio_installed = False
+
+from .core import seqtables
