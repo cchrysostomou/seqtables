@@ -1,0 +1,104 @@
+seq_set1 = [
+    'ACGT',
+    'AAAA',
+    'ATGA',
+    'ATCG',
+    'CCCC',
+    'GGGG'
+]
+
+x = a1.values
+
+
+x = array(
+    [
+        ['A', 'C', 'G', 'T'],
+        ['A', 'A', 'A', 'A'],
+        ['A', 'T', 'G', 'A'],
+        ['A', 'T', 'C', 'G'],
+        ['C', 'C', 'C', 'C'],
+        ['G', 'G', 'G', 'G']
+    ],
+dtype='|S1')
+
+numpy_ops.compare_sequence_matrices(x, x[:2, :]).sum(axis=1)
+
+array(
+    [
+        [4, 1],
+        [1, 4],
+        [2, 2],
+        [1, 1],
+        [1, 0],
+        [1, 0]
+    ]
+)
+
+
+numpy_ops.compare_sequence_matrices(x, x[:2, :], treat_as_match=['A']).sum(axis=1)
+
+array([[4, 4],
+       [4, 4],
+       [3, 4],
+       [1, 4],
+       [2, 4],
+       [2, 4]])
+
+
+numpy_ops.compare_sequence_matrices(x, x[:2, :], treat_as_match=['A', 'G']).sum(axis=1)
+
+array([[4, 4],
+       [4, 4],
+       [3, 4],
+       [3, 4],
+       [3, 4],
+       [4, 4]])
+
+
+numpy_ops.compare_sequence_matrices(x, x[:2, :], treat_as_match=['A', 'G']).sum(axis=1)
+
+array([[4, 4],
+       [4, 4],
+       [3, 4],
+       [3, 4],
+       [3, 4],
+       [4, 4]])
+
+        ['A', 'C', 'G', 'T'],
+        ['A', 'A', 'A', 'A'],
+        ['A', 'T', 'G', 'A'],
+        ['A', 'T', 'C', 'G'],
+        ['C', 'C', 'C', 'C'],
+        ['G', 'G', 'G', 'G']
+    ],
+dtype='|S1')
+numpy_ops.compare_sequence_matrices(x, x[:2, :], flip=True, ignore_characters=['C', 'G'], treat_as_match=['A', 'T'])
+array([[[  0.,   0.],
+        [ nan,  nan],
+        [ nan,  nan],
+        [  0.,   0.]],
+
+       [[  0.,   0.],
+        [ nan,   0.],
+        [ nan,   0.],
+        [  0.,   0.]],
+
+       [[  0.,   0.],
+        [ nan,   0.],
+        [ nan,  nan],
+        [  0.,   0.]],
+
+       [[  0.,   0.],
+        [ nan,   0.],
+        [ nan,  nan],
+        [ nan,  nan]],
+
+       [[ nan,  nan],
+        [ nan,  nan],
+        [ nan,  nan],
+        [ nan,  nan]],
+
+       [[ nan,  nan],
+        [ nan,  nan],
+        [ nan,  nan],
+        [ nan,  nan]]])
