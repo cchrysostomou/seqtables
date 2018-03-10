@@ -3,11 +3,16 @@ from __future__ import absolute_import
 import xarray as xr
 from .internals import _seq_df_to_datarray, _seqs_to_datarray
 from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, relative_entropy
+from ..xarray_mods import st_merge
 from . import numpy_ops
 import warnings
 import numpy as np
 import pandas as pd
+import scipy
 from six import string_types
+from collections import defaultdict
+import itertools
+from orderedset import OrderedSet
 
 
 def df_to_dataarray(df, seq_type, index, user_attrs={}, ref_name='', ref_to_pos_dict={}):
@@ -56,6 +61,13 @@ def from_list(*args, **kwargs):
     new_st = SeqTable(seqs_to_datarray(*args, **kwargs))
     new_st.update_attributes()
     return new_st
+
+
+def merge_seqs(*args, **kwargs):
+    xarr = st_merge.st_merge_arrays(*args, **kwargs)
+    new_st_tab = SeqTable(xarr)
+    new_st_tab.update_attributes()
+    return new_st_tab
 
 
 class SeqTable(xr.DataArray):
@@ -110,6 +122,8 @@ class SeqTable(xr.DataArray):
     null_qual = '!'
     insertions = None
     seq_type = ''
+    has_quality = None
+    encoding_setting = (True, 'utf-8')
 
     def __init__(self, seq_list, *args, **kwargs):
         if isinstance(seq_list, list) or isinstance(seq_list, np.ndarray) or isinstance(seq_list, pd.Series):
@@ -124,11 +138,27 @@ class SeqTable(xr.DataArray):
         self.fill_na_val = self.attrs['seqtable'].get('fill_na', 'N')
         self.insertions = self.attrs['seqtable'].get('insertions')
         self.seq_type = self.attrs['seqtable'].get('seq_type')
+        self.has_quality = 'quality' in self.type.values
 
     def get_sequences(self):
+        """
+            Return the letters for all sequences
+
+            Returns:
+                sequences (np.array)
+        """
         return xr.DataArray(self.sel(type='seq'))
 
     def get_quality(self, as_num=True):
+        """
+            Return the quality scores for all sequences
+
+            Args:
+                as_num (bool, true): If true then it returns the quality scores as numbers
+
+            Returns:
+                quality (np.array)
+        """
         if as_num:
             return xr.DataArray(
                 self.sel(type='quality').values.view(np.uint8) - self.phred_adjust,
@@ -137,6 +167,193 @@ class SeqTable(xr.DataArray):
             )
         else:
             return xr.DataArray(self.sel(type='quality'))
+
+    def view_with_ins(self, positions=None, min_ins_count=0, ins_char='-', return_as_dataframe=True, include_quality=False):
+        """
+            Create a new stacked table where insertions are also represented as columns
+
+            ..note:: performance
+
+                The memory and required time for this operation has not been tested thoroughly yet
+        """
+
+        # insertion_table_name = xarr.attrs['seqtable']['references'][table_ref]['table_names']['ins']
+        # sequence_table_name = xarr.attrs['seqtable']['references'][table_ref]['table_names']['seq']
+        # coord_name = xarr.attrs['seqtable']['references'][table_ref]['dimension_names']['insertion_positions']
+        # p1, p2 = xarr.attrs['seqtable']['references'][table_ref]['dimension_names']['insertion_positions_multiindex'][1:]
+        # read_name = xarr.attrs['seqtable']['references'][table_ref]['dimension_names']['read']
+        # pos_name = xarr.attrs['seqtable']['references'][table_ref]['dimension_names']['position']
+        include_quality = include_quality is True and self.has_quality
+        total_elements = self.insertions.shape[0]  # xarr[p1].shape[0]
+        p1 = self.insertions.index.get_level_values(1)
+        p2 = self.insertions.index.get_level_values(2)
+
+        if min_ins_count > 0:
+            # first collapse the two levels into their unique values, but also return the inverse of unique values so we can map the original index to its respective unique value
+            un_vals, unique_idx, un_counts = np.unique(
+                np.dstack([
+                    p1,
+                    p2
+                ]).squeeze(),
+                axis=0,
+                return_counts=True,
+                return_inverse=True
+            )
+            keep_these_rows = np.where(un_counts[unique_idx] > min_ins_count, True, False)
+        else:
+            keep_these_rows = np.array([True] * total_elements)
+
+        # next identify all rows in the index that have insertions at specific positions which repeat more than min_ins_count
+        if positions is None:
+            positions = list(self.position.values)
+        else:
+            positions = list(positions)
+        # print(positions)
+        is_in_position_of_interest = np.in1d(p1, positions)
+        # print(len(is_in_position_of_interest), p1)
+        # print(self.insertions.iloc[is_in_position_of_interest, :])
+
+        # finally we only want rows that are present in both filteres
+        final_rows_to_select = np.where(keep_these_rows & is_in_position_of_interest)[0]
+
+        # filtered_insertion_table = xarr[insertion_table_name].loc[(slice(None), filtered_ins_index[:, 0], filtered_ins_index[:, 1]), :]
+        filtered_insertion_table = self.insertions.iloc[final_rows_to_select, :]
+        # print(filtered_insertion_table)
+        if filtered_insertion_table.shape[0] == 0:
+            seqs_with_ins = pd.DataFrame(
+                self.loc[:, positions, 'seq'].values.view(np.uint8),
+                columns=positions, index=self.read.values
+            )
+        else:
+            ins_table = filtered_insertion_table.unstack(level=(1, 2), fill_value=ord(ins_char))
+
+            seqs_with_ins = pd.concat([
+                pd.DataFrame(
+                    self.loc[:, positions, 'seq'].values.view(np.uint8),
+                    columns=positions, index=self.read.values
+                ),
+                ins_table['seq']
+            ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
+
+        # realign column sin table so that insertion bases are in the proper position with respect to referene positoins
+        cols = list(seqs_with_ins.columns)
+        sorted_column_indicies = sorted(
+            range(len(cols)),
+            key=lambda k: self._sort_merged_columns(cols[k])
+        )
+
+        seqs_with_ins = seqs_with_ins.iloc[:, sorted_column_indicies]
+        renamed_cols = self._make_positions_multiindex(seqs_with_ins.columns, names=['read_pos', 'loc_ins'])
+        seqs_with_ins.columns = renamed_cols
+
+        # now merge bases table with insertion table
+        if include_quality is True:
+            if filtered_insertion_table.shape[0] == 0:
+                quals_with_ins = pd.DataFrame(
+                    self.loc[:, positions, 'quality'].values.view(np.uint8),
+                    columns=positions, index=self.read.values
+                )
+            else:
+                quals_with_ins = pd.concat([
+                    pd.DataFrame(
+                        self.loc[:, positions, 'quality'].values.view(np.uint8),
+                        columns=positions, index=self.read.values
+                    ),
+                    ins_table['quality']
+                ], axis=1).fillna(ord(self.null_qual)).astype(np.uint8)
+
+            quals_with_ins = quals_with_ins.iloc[:, sorted_column_indicies]
+            quals_with_ins.columns = renamed_cols
+
+            seqs_with_ins = pd.concat([seqs_with_ins, quals_with_ins], axis=1, keys=['seq', 'quality'])
+
+        if return_as_dataframe is True:
+            return seqs_with_ins
+        else:
+            if include_quality is True:
+                return xr.DataArray(
+                    np.dstack([
+                        seqs_with_ins['seq'].values,
+                        seqs_with_ins['quality'].values + self.phred_adjust,
+                    ]).view('S1'),
+                    dims=('read', 'position', 'type'),
+                    coords={
+                        'read': seqs_with_ins.index,
+                        'position': renamed_cols,
+                        'type': ['seq', 'quality']
+                    }
+                )
+            else:
+                return xr.DataArray(
+                    seqs_with_ins.values.view('S1'),
+                    dims=('read', 'position'),
+                    coords={
+                        'read': seqs_with_ins.index,
+                        'position': renamed_cols,
+                    }
+                )
+
+    def slice_sequences(self, positions, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0):
+        if empty_chars is None:
+            empty_chars = self.fill_na_val
+
+        positions = OrderedSet(list(positions))
+
+        # confirm that all positions are present in the column
+        missing_pos = positions - set(self.position.values)
+
+        if len(missing_pos) > 0:
+            new_positions = list(positions & set(self.positions.values))
+            prepend = ''.join([empty_chars for p in positions if p < self.position.values.min()])
+            append = ''.join([empty_chars for p in positions if p > self.positions.values.max()])
+            positions = new_positions
+            warnings.warn("The sequences do not cover all positions requested. {0}'s will be appended and prepended to sequences as necessary".format(empty_chars))
+        else:
+            prepend = ''
+            append = ''
+
+        if include_insertions:
+            tmp_data = self.view_with_ins(positions, min_ins_count=min_ins_count, include_quality=return_quality, return_as_dataframe=False)
+        else:
+            tmp_data = self.loc[:, positions]
+
+        num_chars = tmp_data.shape[1]
+
+        if num_chars == 0:
+            # nothing to return
+            if return_quality:
+                qual_empty = self.null_qual * (len(prepend) + len(append))
+                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty}, columns=['seqs', 'quals'], index=self.index)
+            else:
+                return pd.DataFrame(prepend + append, columns=['seqs'], index=self.index)
+
+        # slice data into sequences
+        if 'type' in tmp_data.dims:
+            substring = pd.DataFrame(
+                {
+                    name: tmp_data.sel(type='seq').values.copy().view('S{0}'.format(num_chars)).ravel()
+                }, index=self.read.values
+            )
+        else:
+            substring = pd.DataFrame({
+                name: tmp_data.values.copy().view('S{0}'.format(num_chars)).ravel()
+            }, index=self.read.values)
+
+        if prepend or append:
+            substring['seqs'] = prepend + substring['seqs'] + append  # substring['seqs'].apply(lambda x: prepend + x + append)
+
+        if 'type' in tmp_data.dims and return_quality is True:
+            subquality = tmp_data.sel(type='quality').values.copy().view('S{0}'.format(num_chars)).ravel()
+            substring['quals'] = subquality
+            if prepend or append:
+                prepend = self.null_qual * len(prepend)
+                append = self.null_qual * len(append)
+                substring['quals'] = prepend + substring['quals'] + append  # .apply(lambda x: prepend + x + append)
+
+        if return_column_positions is True:
+            return substring, tmp_data.position.values
+        else:
+            return substring
 
     def subsample(self, numseqs, replace=False):
         """
@@ -191,6 +408,34 @@ class SeqTable(xr.DataArray):
             positions_to_compare = sorted(list(set(overlapping_positions) - set(positions_to_compare)))
 
         return positions_to_compare
+
+    @classmethod
+    def _sort_merged_columns(cls, x):
+        return x if isinstance(x, tuple) else (x, 0)
+
+    @classmethod
+    def _make_positions_multiindex(cls, columns, names=[]):
+        return pd.MultiIndex.from_tuples(
+            [x if isinstance(x, tuple) else (x, 0) for x in columns],
+            names=names
+        )
+        # return [
+        #     [x[0] if isinstance(x, tuple) else x for x in columns],
+        #     [x[1] if isinstance(x, tuple) else 0 for x in columns],
+        # ]
+
+    def _check_positions(self, positions):
+        if not(positions is None):
+            s1 = set(list(self.position.values))
+            s2 = set(list(positions))
+            if s1.issuperset(s2) is False:
+                warnings.warn('Warning we cannot perform the request at all positions provided as they are undefined in this sequence table. \
+                    The following positions will be ignored: {0}'.format(','.join([str(_) for _ in (s2 - s1)])))
+            positions = [p for p in positions if p in s1]
+        else:
+            positions = list(self.position.values)
+
+        return positions
 
     def compare_to_references(
             self, reference_seqs, positions_to_compare=None, ref_seq_positions=None, flip=False,
@@ -300,7 +545,15 @@ class SeqTable(xr.DataArray):
 
         return hamming_result
 
-    def get_seq_dist(self, positions=None, method='counts', ignore_characters=[], weight_by=None):
+    def calculate_pwm(self, pwm, positions=None, pwm_column_names='ACTG', null_scores=1):
+        positions = self._check_positions(positions)
+        return pd.DataFrame(
+            numpy_ops.seq_pwm_ascii_map_and_score(pwm, self.loc[:, positions, 'seq'].values, pwm_column_names=pwm_column_names, use_log_before_sum=True, null_scores=null_scores),
+            index=self.read.values,
+            columns=['PWM_score']
+        )
+
+    def get_seq_dist(self, positions=None, method='counts', ignore_characters=[], weight_by=None, include_insertion_counts=False):
         """
             Returns the distribution of unique letter observed at each position in seqarray
         """
@@ -337,6 +590,10 @@ class SeqTable(xr.DataArray):
 
         dist = numpy_ops.numpy_value_counts_bin_count(seq_dist_arr, weight_by)   # compare.apply(pd.value_counts).fillna(0)
 
+        if include_insertion_counts:
+            insertion_events = self.get_insertion_events(positions=None, include_empty_positions=False, min_quality=0)
+            dist = pd.concat([dist, pd.DataFrame(insertion_events.values, index=insertion_events.index, columns=[ord('^')]).T])
+
         dist.rename({c: chr(c) for c in list(dist.index)}, columns={i: c for i, c in enumerate(positions)}, inplace=True)
 
         drop_values = list(set(ignore_characters) & set(list(dist.index)))
@@ -349,6 +606,125 @@ class SeqTable(xr.DataArray):
             dist = get_bits(dist.astype(float) / dist.sum(axis=0), N, alphabet=list(dist.index))
 
         return dist.fillna(0)
+
+    def get_substrings(self, word_length, positions=None, subsample_seqs=None, weights=None, include_insertions=False, min_ins_count=0):
+        """
+            Useful function for counting the occurrences of all possible SUBSTRINGs within a sequence table
+
+            Lets say we have the following sequences:
+            ACTW
+            ATTA
+
+            We want to get the occurrences of all combinations of substrings of length 3 in each sequence.
+            For example
+                1. we can have ACT, ACW, CTW, ATW in the first sequence
+                2. we can have ATT, ATA, TTA, ATA in the second sequence
+
+            Args:
+                word_length (int): the length of substrings
+                subsample_seqs (int): If provided, then will take only a random subsampling of the data before performing substring function
+
+            Returns:
+                dataframe: rows of dataframe are unique sequences of a given word length, Columns represents a specific combination of charcters in the word
+
+                    .. note::Dataframe format
+
+                        1. The number of columns should be equal to the total number of combinations (n choose k) where n = length of characters in seqtable, k = word_length
+                        2. The sum of all rows in the dataframe should be equal to the the total number of sequences passed into the function
+
+            Examples:
+                >>> import seq_tables
+                >>> st = seq_tables.SeqTable(['ACTW', 'ATTA'])
+                >>> tmp = st.get_substrings(3)
+                Returns:
+                        (1, 2, 3) (1, 2, 4) (1, 3, 4) (2, 3, 4)
+                    ACT    1          0         0         0
+                    ACW    0          1         0         0
+                    CTW    0          0         0         1
+                    ATW    0          0         1         0
+                    ATA    0          1         1         0
+                    ATT    1          0         0         0
+
+                    TTA    0          0         0         1
+
+        """
+        def dict_count(arr):
+            dict_words = defaultdict(float)
+
+            def arr_fxn(a, b):
+                dict_words[a] += float(b)
+                return 0
+
+            assert(arr.shape[1] == 2)
+
+            np.apply_along_axis(lambda x: arr_fxn(x[0], x[1]), arr=arr, axis=1)
+            return dict_words
+
+        def col_to_str(col):
+            if isinstance(col, tuple):
+                if col[1] == 0:
+                    return 'p' + str(col[0])
+                else:
+                    return 'p{0}_ins_{1}'.format(col[0], abs(col[1]))
+            else:
+                return 'p' + str(col)
+
+        if include_insertions:
+            # stack insertions with bases
+            tmp_table = self.view_with_ins(positions=positions, min_ins_count=min_ins_count, return_as_dataframe=False, include_quality=False)
+        else:
+            # only slice the columns without insertions
+            tmp_table = self.loc[:, list(self.position.values) if positions is None else list(positions), 'seq']
+
+        tmp_table = tmp_table if subsample_seqs is None else tmp_table.iloc[np.random.choice(self.shape[0], subsample_seqs)[0]]
+
+        # convert column names to a string??
+        pos_as_string = [col_to_str(p) for p in tmp_table.position.values]
+        mapper = {c: i for i, c in enumerate(pos_as_string)}
+        rev_mapper = {i: c for i, c in enumerate(pos_as_string)}
+        substrings = [[mapper[x] for x in i] for i in itertools.combinations(list(pos_as_string), word_length)]
+        table_values = tmp_table.values.view('S1')
+        view_value = 'S' + str(word_length)
+
+        dataframes = []
+
+        if weights is None:
+            for s in substrings:
+                [a, b] = np.unique(table_values[:, s].reshape(-1).view(view_value), return_counts=True)
+                dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
+            substring_counts_df = pd.concat(dataframes, axis=1).fillna(0)
+        else:
+            for s in substrings:
+                arr = table_values[:, s].reshape(-1).view(view_value)
+                [a, b] = np.unique(arr, return_inverse=True)
+                c = numpy_ops.numpy_value_counts_bin_count(b, weights=weights).reset_index().values
+                a = a[c[:, 0].astype(int)]
+                b = c[:, 1]
+                dataframes.append(pd.DataFrame(b, index=a, columns=[tuple([rev_mapper[c] for c in s])]))
+
+            substring_counts_df = pd.concat(dataframes, axis=1).fillna(0)
+        if self.encoding_setting[0] is False:
+            substring_counts_df.index = substring_counts_df.index.map(lambda x: x.decode())
+        return substring_counts_df
+
+    def get_insertion_seq_dist(self, positions=None, method='counts', min_ins_count=0):
+        if positions is None:
+            ins_df = self.insertions
+        else:
+            positions = list(self.insertions.index.levels[1].intersection(positions))
+            ins_df = self.insertions.loc[(slice(None), positions), :]
+        ins_dist = ins_df.reset_index().groupby(by=['position_ins', 'loc_ins']).seq.value_counts().unstack().fillna(0)
+        total_ins = ins_dist.sum(axis=1)
+        ins_dist = ins_dist[total_ins >= min_ins_count]
+        ins_dist.rename(columns={c: chr(c) for c in ins_dist.columns}, inplace=True)
+        ins_dist['-'] = self.shape[0] - ins_dist.sum(axis=1)
+        ins_dist = ins_dist.T
+        if method == 'freq':
+            ins_dist = ins_dist.astype(float) / ins_dist.sum(axis=0)
+        elif method == 'bits':
+            N = self.shape[0]
+            ins_dist = get_bits(ins_dist.astype(float) / ins_dist.sum(axis=0), N, alphabet=list(ins_dist.index))
+        return ins_dist
 
     def mutation_profile(
         self, reference_seqs, positions_to_compare=None, ref_seq_positions=None,
@@ -550,10 +926,6 @@ class SeqTable(xr.DataArray):
             del ins_df
 
         return filtered
-        # if inplace is False:
-
-        # else:
-        #     self = self[percent_above >= p]
 
     def convert_low_bases_to_null(self, q, replace_with=None, inplace=False, remove_from_insertions=True):
         """
@@ -658,11 +1030,140 @@ class SeqTable(xr.DataArray):
             bins, exclude_null_quality, sample, percentiles, stats, plotly_sampledata_size, use_multiindex
         )
 
-    def seq_logo(self, positions=None, weights=None, method='freq', ignore_characters=[], **kwargs):
-        dist = self.get_seq_dist(positions, method, ignore_characters, weights)
-        return draw_seqlogo_barplots(dist, alphabet=self.seq_type, **kwargs)
+    def seq_logo(self, positions=None, include_insertions=True, weights=None, method='freq', ignore_characters=[], min_ins_count=0, **kwargs):
+        dist_no_ins = self.get_seq_dist(positions, method, ignore_characters, weights)
+        if include_insertions is True:
+            dist_with_ins = self.get_insertion_seq_dist(positions, method=method, min_ins_count=min_ins_count)
+            merged_dist = pd.concat([dist_no_ins, dist_with_ins], axis=1).fillna(0)
+        else:
+            merged_dist = dist_no_ins.fillna(0)
 
-    def get_consensus(self, positions=None, modecutoff=0.5):
+        cols = merged_dist.columns
+        sorted_column_indicies = sorted(
+            range(len(cols)),
+            key=lambda k: self._sort_merged_columns(cols[k])
+        )
+
+        merged_dist = merged_dist.iloc[:, sorted_column_indicies]
+        return draw_seqlogo_barplots(merged_dist, alphabet=self.seq_type, **kwargs)
+
+    def _get_filtered_insertions_by_quality(self, min_quality):
+        if self.insertions is None:
+            return pd.DataFrame()
+        elif min_quality == 0:
+            return self.insertions
+        return self.insertions[self.insertions['quality'] >= min_quality].copy()
+
+    def get_insertion_events(self, positions=None, include_empty_positions=False, min_quality=0):
+        """
+            Return the number of times an insertion occurs (at least once) at a specific position
+        """
+        ins_df = self._get_filtered_insertions_by_quality(min_quality)
+
+        if ins_df.shape[0] > 0:
+            if include_empty_positions:
+                insertion_events = pd.Series(ins_df.loc[(slice(None), slice(None), -1), :].groupby(level=1).apply(len), index=positions, name='position')
+            else:
+                insertion_events = pd.Series(ins_df.loc[(slice(None), slice(None), -1), :].groupby(level=1).apply(len), name='position')
+        else:
+            insertion_events = [np.nan]
+
+        if not(positions is None):
+            return insertion_events.loc[insertion_events.index.intersection(positions)]
+        else:
+            return insertion_events
+
+    def get_insertion_distribution(self, positions=None, include_empty_positions=False, min_quality=0):
+        ins_df = self._get_filtered_insertions_by_quality(min_quality).groupby(level=[1, 2]).apply(len).reset_index('loc_ins').rename(columns={0: 'counts'})
+
+        if include_empty_positions:
+            missing_indexes = set(positions) - set(ins_df.index)
+            ins_df = pd.concat([ins_df, pd.DataFrame([np.nan] * len(missing_indexes), columns=['counts'], index=missing_indexes)]).sort_index()
+            ins_df.index.name = 'position'
+        else:
+            ins_df.index.name = 'position'
+
+        if not(positions is None):
+            return ins_df.loc[ins_df.index.intersection(positions)]
+        else:
+            return ins_df
+
+    def get_average_insertion_quality(self, positions=None, include_empty_positions=False):
+        ins_df = self.insertions.groupby(level=[1, 2]).quality.apply(np.mean).reset_index('loc_ins')
+
+        if include_empty_positions:
+            missing_indexes = set(positions) - set(ins_df.index)
+            ins_df = pd.concat([ins_df, pd.DataFrame([np.nan] * len(missing_indexes), columns=['quality'], index=missing_indexes)]).sort_index()
+            ins_df.index.name = 'position'
+        else:
+            ins_df.index.name = 'position'
+
+        if not(positions is None):
+            return ins_df.loc[ins_df.index.intersection(positions)]
+        else:
+            return ins_df
+
+    def get_insertion_expectations(self, positions=None, include_empty_positions=False, method='mean', min_quality=0):
+        """
+            Return an aggregated value that illustrates the type of insertion observed at each position (i.e. mean number of insertions, max number of insertions, min number of insertions, etc)
+        """
+        allowed_stats = ['mean', 'median', 'max']
+        assert method in allowed_stats, "We only offer insertion statistics for the following: {0}".format(','.join(allowed_stats))
+
+        ins_df = self._get_filtered_insertions_by_quality(min_quality)
+
+        if ins_df.shape[0] > 0:
+            # calculate the total number of times we have insertion data at each position
+            total_p = ins_df.groupby(level=[1]).apply(len)
+
+            tmp_agg = ins_df.groupby(level=[1, 2]).apply(len).reset_index('loc_ins')
+            if method == 'mean':
+                # return the expected # of insertions at that position
+                # we calculate this as the weighted average where weight = # of times (groupby(level=0).sum()) we observed a specific insertion type at a position (pos 88, loc_ins -1)
+                series = tmp_agg.product(axis=1).groupby(level=0).sum() / total_p
+            elif method == 'max':
+                # calculate the maximum insertion event even observed at a specific position (remember insertion events are labeled as negative so max = min...yea...)
+                series = tmp_agg.groupby(level=0).loc_ins.min()
+            elif method == 'median':
+                series = tmp_agg.groupby(level=0).apply(lambda x: np.median(np.repeat(*(x.values.T))))
+        else:
+            series = [np.nan]
+
+        if include_empty_positions:
+            insertion_events = pd.Series(series, index=positions, name='position')
+        else:
+            insertion_events = pd.Series(series, name='position')
+        if not(positions is None):
+            return insertion_events.loc[insertion_events.index.intersection(positions)]
+        else:
+            return insertion_events
+
+    def get_consensus_depr(self, positions=None, modecutoff=0.5):
+        """
+            Returns the sequence consensus of the bases at the defined positions
+
+            Args:
+                positions: Slice which positions in the table should be conidered
+                modecutoff: Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)
+
+            .. note:: deprecation
+
+                This function appears to be slightly slower than the newer get_consensus function
+        """
+        compare = self.loc[:, positions, 'seq'].values.view(np.uint8) if positions else self.loc[:, :, 'seq'].values.view(np.uint8)
+        cutoff = float(compare.shape[0]) * modecutoff
+        chars = compare.shape[1]
+        # dist = np.int8(compare.apply(lambda x: x.mode()).values[0])
+        # dist = np.int8(compare.reduce(func=lambda x, axis: scipy.stats.mode(x), dim='position'))   # apply(lambda x: x.mode()).values[0])
+        dist = np.apply_along_axis(arr=compare, func1d=lambda x: scipy.stats.mode(x), axis=0)
+        # dist[0][0] # => mode
+        # dist[1][1] # => counts for mode
+        dist[0][0][dist[1][0] <= cutoff] = ord('N')
+
+        seq = (np.uint8(dist[0][0])).view('S' + str(chars))[0]
+        return seq
+
+    def get_consensus(self, positions=None, modecutoff=0.5, include_insertions=True, return_column_positions=False, exclude_insertions_with_gap_cons=True):
         """
             Returns the sequence consensus of the bases at the defined positions
 
@@ -670,11 +1171,33 @@ class SeqTable(xr.DataArray):
                 positions: Slice which positions in the table should be conidered
                 modecutoff: Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)
         """
-        compare = self.seq_table.loc[:, positions] if positions else self.seq_table
-        cutoff = float(compare.shape[0]) * modecutoff
-        chars = compare.shape[1]
-        dist = np.int8(compare.apply(lambda x: x.mode()).values[0])
-        dist[(compare.values == dist).sum(axis=0) <= cutoff] = ord('N')
-        seq = dist.view('S' + str(chars))[0]
-        return seq
 
+        non_ins_dist = self.get_seq_dist(positions=positions)
+        if include_insertions:
+            ins_dist = self.get_insertion_seq_dist(positions=positions)
+            merged_dist = pd.concat([non_ins_dist, ins_dist], axis=1).fillna(0)
+        else:
+            merged_dist = non_ins_dist.fillna(0)
+        cols = merged_dist.columns
+        sorted_column_indicies = sorted(
+            range(len(cols)),
+            key=lambda k: self._sort_merged_columns(cols[k])
+        )
+
+        merged_dist = merged_dist.iloc[:, sorted_column_indicies]
+        below_cutoff = merged_dist.max(axis=0) <= merged_dist.sum(axis=0) * modecutoff
+        cons_bases = np.array(merged_dist.index.values, dtype='S1')[merged_dist.values.argmax(axis=0)]  # => use this rather than idx max because (a) its faster, and (b) it returns a numpy array with data type S1 rathr than object
+        cons_bases[below_cutoff] = 'N'
+
+        if include_insertions is True and exclude_insertions_with_gap_cons is True:
+            # lets figure out which are our insertion columns
+            idx_ins_cols = [True if isinstance(c, tuple) else False for i, c in enumerate(merged_dist.columns)]
+            keep_cols = ~((cons_bases == '-') & idx_ins_cols)
+            cons_bases = cons_bases[keep_cols]
+            cols = merged_dist.columns[keep_cols]
+
+        seq = (cons_bases).view('S' + str(len(cols)))[0]
+        if return_column_positions is True:
+            return seq, merged_dist.columns
+        else:
+            return seq

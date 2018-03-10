@@ -11,6 +11,12 @@ except:
     plotly_installed = False
     warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
 
+global_3d_mapper = np.repeat(0, 256 * 4).reshape(256, -1)
+global_3d_mapper[ord('T'), :] = np.array([0, 0, 0, 1])
+global_3d_mapper[ord('C'), :] = np.array([0, 1, 0, 0])
+global_3d_mapper[ord('A'), :] = np.array([1, 0, 0, 0])
+global_3d_mapper[ord('G'), :] = np.array([0, 0, 1, 0])
+
 
 def compare_sequence_matrices(seq_arr1, seq_arr2, flip=False, treat_as_match=[], ignore_characters=[], return_num_bases=False):
     """
@@ -354,3 +360,148 @@ def get_quality_dist(
         stats_df = pd.concat([pd.DataFrame(binned_data), pd.DataFrame(binned_data_stats)])
 
     return stats_df, graphs
+
+
+def filter_by_count(arr, axis, min_count):
+    """
+        Filter a numpy array by return values whose unique row/column counts across an axis are > some cutoff
+    """
+    # first collapse the two levels into their unique values, but also return the inverse of unique values so we can map the original index to its respective unique value
+    # is_unique -> represents the mapped index to the position of the unique value in un_vals and un_counts
+    # unique_idx => shape = shape of original array => performining un_vals[unique_idx] returns the original array!
+    # un_vals => shape of unique values in array
+    # un_counts => shape of unique values in array
+
+    un_vals, unique_idx, un_counts = np.unique(
+        arr,
+        axis=axis,
+        return_counts=True,
+        return_inverse=True
+    )
+
+    # STEPS WE WILL PERFORM
+    # first lets represent the respective COUNTS OF EACH UNIQUE VALUE but have its shape = the shape of the original index (this is identical to a "transform" in pandas groupby)
+    # count_of_its_unique_value = un_counts[unique_idx]  # (unique_idx is REPETIIVE OF COURSE)
+
+    # # next lets only identify rows that are above a cutoff
+    # rows_with_unique_value_above_cutoff = np.where(count_of_its_unique_value > cutoff)
+
+    # # now, since we know which rows (from the unique row table) we are interested in, lets go ahead and actually grab those rows
+    # unique_idx[rows_with_unique_value_above_cutoff]
+
+    # # finally, we want to recapitulate the ORIGINAL data from each row defined by unique_idx with uniquevalues > cutoff
+    # filtered_rows = un_vals[unique_idx[rows_with_unique_value_above_cutoff]]
+
+    # PUTTING IT ALL TOGETHER WE GET:
+    return un_vals[unique_idx[np.where(un_counts[unique_idx] > min_count)]]
+
+
+def return_3d_arr(arr):
+    """
+        return a 3D array where:
+         * dim1 = # of sequences,
+         * dim2 = # of bases per sequence
+         * dim3 = a 4 array element for each letter
+             * A is encoded to [1, 0 , 0, 0]
+             * C is encoded to [0, 1 , 0, 0]
+             * G is encoded to [0, 0 , 1, 0]
+             * T is encoded to [0, 0 , 0, 1]
+    """
+    return global_3d_mapper[arr]
+
+
+def pairwise_tensor_dot(arr1, arr2):
+    # use tensor dot product to perform the pairwise distances
+    s1_arr_3d = return_3d_arr(arr1)
+    s2_arr_3d = return_3d_arr(arr2)
+    return s1_arr_3d.shape[1] - np.tensordot(s1_arr_3d, s2_arr_3d.T, ([1, 2], [1, 0]))
+
+
+def pairwise_einsum_dot(arr1, arr2):
+    """
+        # use einsum as a faster implementation of tensor dot product
+        http://ajcr.net/Basic-guide-to-einsum/
+        https://stackoverflow.com/questions/26089893/understanding-numpys-einsum
+    """
+    s1_arr_3d = return_3d_arr(arr1)
+    s2_arr_3d = return_3d_arr(arr2)
+    return s1_arr_3d.shape[1] - np.einsum('mij,lij->ml', s1_arr_3d, s2_arr_3d)
+
+
+def pairwise_base_comparison(arr1, arr2):
+    """
+        Rather than conver to 3d array and perform dot product, simply compare all possible NxM bases and take sum where
+        N = # of sequences in arr1
+        M = # of sequences in arr2
+    """
+    # return (return_2d_arr(arr1)[:, np.newaxis] != return_2d_arr(arr2)).sum(axis=2)
+    # even faster implementation => use einsum to perform axis sum
+    return np.einsum('ijk->ij', (arr1[:, np.newaxis] != arr2).astype(np.uint8))
+
+
+def pairwise_scipy_cdist(arr1, arr2, convert_to_int=False):
+    from scipy.spatial.distance import cdist
+    s1_arr_2d = arr1
+    s2_arr_2d = arr2
+    dist_val = min(s1_arr_2d.shape[1], s2_arr_2d.shape[1])
+    if convert_to_int:
+        return (np.round(dist_val * (cdist(s1_arr_2d, s2_arr_2d, 'hamming')))).astype(np.int)
+    else:
+        return dist_val * (cdist(s1_arr_2d, s2_arr_2d, 'hamming'))
+
+
+def seq_pwm_ascii_map_and_score(pwm_arr, seqs_arr, pwm_column_names='ACGT', use_log_before_sum=True, null_scores=1):
+    """
+        Calculate the pwm score for each sequence in an array
+
+        A PWM matrix is converted into a matrix containing 256 column (one column for each ascii letter).
+        Then the PWM scores at each ascii/base is copied to the PWM matrix (create a sparse matrix where only leters in the alphabet provided
+        contains any information)
+
+        Reindexing the scores is the same as above
+
+        Args:
+            pwm_arr (np.array): rows = position, columns = base pair in order of argument pwm_column_names
+
+                ..note:: Number of columns
+
+                    Number of columns must be equal to the string length in pwm_column_names
+
+            seqs_arr (1D np.array): rows = sequence of interest
+
+                ..note:: Sequence Length
+
+                    Sequence length must be equal to the number of rows in pwm_arr
+
+            pwm_column_names (string): Defines the base represented by each "column" in the pwm array
+
+        Returns:
+            scores(np.array 1D): score for each sequence
+    """
+
+    assert(pwm_arr.shape[1] == len(pwm_column_names))
+
+    # convert sequences into a table such that each row is a sequence and each column is THE ASCII CODE for a specific letter in each seuqence
+    # NxB 2d array where N = # of sequences B = length of sequence (Note the np.uint8)
+    seq_as_ascii_arr = np.array(seqs_arr, dtype='S').view('S1').view(np.uint8).reshape(seqs_arr.shape[0], -1)
+
+    assert(pwm_arr.shape[0] == seq_as_ascii_arr.shape[1])
+
+    # instead of using letters to represent a pwm, make a larger matrix where you can accoutn for all "ascii" values
+    pwm_using_asci = np.zeros((pwm_arr.shape[0], 256), dtype=np.float)
+    pwm_using_asci.fill(null_scores)
+
+    for p, l in enumerate(pwm_column_names):
+        # now the score for a specific base at eahc position is represented by its ascii value and not letter
+        pwm_using_asci[:, ord(l.upper())] = pwm_arr[:, p]
+
+    # seqs_arr_mapped_to_pwm is still an NxB matrix except now each position  points to a specific column of interest in the PWM
+    # we can select each "B position x PWM score" for each letter  in the matrix using the following
+    weights_at_each_position = pwm_using_asci[np.arange(0, seq_as_ascii_arr.shape[1]), seq_as_ascii_arr]
+
+    if use_log_before_sum:
+        scores = np.exp(np.log(weights_at_each_position).sum(axis=1))
+    else:
+        scores = weights_at_each_position.sum(axis=1)
+
+    return scores

@@ -1,5 +1,5 @@
 numexpr
-numpy
+numpy>=1.13
 cython
 jupyter
 pandas>=0.2
@@ -7,3 +7,4 @@ xarray
 matplotlib
 plotly
 regex
+orderedset

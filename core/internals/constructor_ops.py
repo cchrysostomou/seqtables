@@ -168,11 +168,12 @@ def _algn_seq_to_datarray(
     else:
         # create a dataarray for aligned sequences
         seq_xr = xr.DataArray(
-            seq_arr,
-            dims=[prefix + 'read', position_dim],
+            seq_arr.reshape(seq_arr.shape[0], seq_arr.shape[1], 1),
+            dims=[prefix + 'read', position_dim, 'type'],
             coords={
                 position_dim: pos_arr,
                 prefix + 'read': aligned_arrs[5],  # index if index.shape[0] > 0 else np.range(1, 1 + seq_arr.shape[0])
+                'type': ['seq']
             }
         )
 
@@ -346,11 +347,12 @@ def _seqs_to_datarray(
     else:
         # create a dataarray for aligned sequences
         seq_xr = xr.DataArray(
-            seq_arr,
-            dims=[prefix + 'read', position_dim],
+            seq_arr.reshape(seq_arr.shape[0], seq_arr.shape[1], 1),
+            dims=[prefix + 'read', position_dim, 'type'],
             coords={
                 position_dim: pos_arr,
-                prefix + 'read': index if not(index is None) and index.shape[0] > 0 else np.arange(1, 1 + seq_arr.shape[0])
+                prefix + 'read': index if not(index is None) and index.shape[0] > 0 else np.arange(1, 1 + seq_arr.shape[0]),
+                'type': ['seq']
             }
         )
 
