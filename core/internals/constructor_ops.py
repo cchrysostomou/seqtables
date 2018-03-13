@@ -79,7 +79,9 @@ def _seq_df_to_datarray(
     ref_pos_names={},
     ignore_ref_col=False,
     ref_name='',
-    ref_to_pos_dict={}
+    ref_to_pos_dict={},
+    min_pos=-1,
+    max_pos=-2
 ):
     """
 
@@ -108,12 +110,14 @@ def _seq_df_to_datarray(
             df[map_cols['cigar']].values,
             np.array(list(index))
         ],
+        min_pos=min_pos,
+        max_pos=max_pos,
         ref_to_pos_dim=ref_to_pos_dict[ref_name] if ref_name in ref_to_pos_dict else None
     )
 
 
 def _algn_seq_to_datarray(
-    ref_name, seq_type, phred_adjust, data, ref_to_pos_dim=None
+    ref_name, seq_type, phred_adjust, data, ref_to_pos_dim=None, min_pos=-1, max_pos=-2, edge_gap='$', null_quality='!'
 ):
     """
         Create sets of xarray dataarrays from the variable data
@@ -132,7 +136,7 @@ def _algn_seq_to_datarray(
 
     # add in gaps and remove indels in cython fnc
 
-    aligned_arrs = df_to_algn_arr(*data, edge_gap=ord('$'))  # , edgeGap='$')
+    aligned_arrs = df_to_algn_arr(*data, edge_gap=ord(edge_gap), null_quality=ord(null_quality), min_pos=min_pos, max_pos=max_pos)  # , edgeGap='$')
 
     has_quality = data[1].shape[0] > 0
 

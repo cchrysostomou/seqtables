@@ -15,12 +15,15 @@ import itertools
 from orderedset import OrderedSet
 
 
-def df_to_dataarray(df, seq_type, index, user_attrs={}, ref_name='', ref_to_pos_dict={}):
+def df_to_dataarray(df, seq_type, index, user_attrs={}, ref_name='', ref_to_pos_dict={}, min_pos=-1, max_pos=-2):
     """
         Converts a dataframe into an XARRAY object (not a seqtable)
     """
     ignore_ref_col = True if ref_name else False
-    arrs, attrs = _seq_df_to_datarray(df, seq_type, index, ignore_ref_col=ignore_ref_col, ref_name=ref_name, ref_to_pos_dict=ref_to_pos_dict)
+    arrs, attrs = _seq_df_to_datarray(
+        df, seq_type, index, ignore_ref_col=ignore_ref_col, ref_name=ref_name, ref_to_pos_dict=ref_to_pos_dict,
+        min_pos=min_pos, max_pos=max_pos
+    )
     attrs['user_defined'] = user_attrs
     # return xr.Dataset(data_vars=arrs, attrs=attrs)
     return xr.DataArray(arrs, attrs=attrs, name=ref_name if ref_name else None)
@@ -121,7 +124,7 @@ class SeqTable(xr.DataArray):
     fill_na_val = 'N'
     null_qual = '!'
     insertions = None
-    seq_type = ''
+    seq_type = None
     has_quality = None
     encoding_setting = (True, 'utf-8')
 
@@ -389,7 +392,7 @@ class SeqTable(xr.DataArray):
         ref_seq_positions = ref_seq_positions[:max_seq_len]
 
         # print(reference_seqs)
-        return seqs_to_datarray(reference_seqs)
+        return seqs_to_datarray(reference_seqs, seq_type=cls.seq_type)
 
     @classmethod
     def _get_positions(cls, set_diff, p1, p2, positions_to_compare=None):
@@ -491,10 +494,12 @@ class SeqTable(xr.DataArray):
             self.loc[:, positions_to_compare, 'seq'].values, reference_seqs.loc[:, positions_to_compare].values, flip,
             treat_as_match, ignore_characters, return_num_bases
         )
-
+        # print('res')
+        # print(positions_to_compare)
+        # print(res[0].shape, res.shape, self.read.values.shape, len(positions_to_compare), reference_seqs.read.values.shape)
         xrtmp = xr.DataArray(
             res[0] if return_num_bases is True else res, dims=(names[0], 'position', names[1]),
-            coords={names[0]: self.read.values, 'position': positions_to_compare, names[1]: reference_seqs.read.values}
+            # coords={names[0]: self.read.values, 'position': positions_to_compare, names[1]: reference_seqs.read.values}
         )
 
         if return_as_dataframe:

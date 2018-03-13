@@ -90,6 +90,7 @@ def compare_sequence_matrices(seq_arr1, seq_arr2, flip=False, treat_as_match=[],
         diff_arr = diff_arr.astype(np.float)
         diff_arr[ignore_pos] = np.nan
 
+    diff_arr = diff_arr[0]
     if return_num_bases:
             num_bases = np.apply_along_axis(
                 arr=diff_arr,

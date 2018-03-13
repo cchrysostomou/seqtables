@@ -10,30 +10,11 @@ from libc.string cimport strcmp
 from libc.stdlib cimport atoi
 # from libcpp.string cimport string
 
-
-
 DTYPE_2 = np.int64
 ctypedef np.int64_t DTYPE_2_t
 
 DTYPE_str = np.str
 ctypedef np.str DTYPE_str_t
-
-
-cdef extern from "regex.h" nogil:
-    # import regex.h functions
-    # taken from (http://romankleiner.blogspot.com/2015/06/cython-and-regular-expressions.html)
-    # from doc => "Note that we only import what we need later on, and that we tell Cython to release the GIL when executing the imported functions via the magic nogil keyword."
-
-    ctypedef struct regmatch_t:
-       int rm_so
-       int rm_eo
-    ctypedef struct regex_t:
-       pass
-    int REG_EXTENDED
-    int regcomp(regex_t* preg, const char* regex, int cflags)
-    int regexec(const regex_t *preg, const char *string, size_t nmatch, regmatch_t pmatch[], int eflags)
-    void regfree(regex_t* preg)
-
 
 cdef struct regex_result:
     int numHits, totalIns, totalDel
@@ -56,8 +37,6 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     """
     cdef int* tempEventCounts = <int *>malloc(strLen * sizeof(int))
     cdef char* tempEventTypes = <char *>malloc(strLen * sizeof(char))
-    cdef regex_t regex_obj
-    cdef regmatch_t regmatch_obj[1]
     cdef int regex_res = 0, current_str_pos = 0, matching_pos = 0, tmpStart, tmpStop, tmpNum = 0
     cdef char tmpEv
     cdef char* regexcigar = "[0-9]+[A-Z]"
@@ -82,33 +61,11 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
             matching_pos += 1
         charNum += 1
 
-    # regcomp(&regex_obj, regexcigar, REG_EXTENDED)
-
-    # regex_res = regexec(&regex_obj, cigarstring, 1, regmatch_obj, 0)
-
-    # while regex_res == 0:
-    #     tmpStart = current_str_pos + regmatch_obj[0].rm_so
-    #     tmpStop = current_str_pos + regmatch_obj[0].rm_eo
-    #     # tmpNum = atoi(cigarstring[tmpStart:tmpStop - 1])
-    #     tmpEv = cigarstring[tmpStop-1]
-    #     tempEventCounts[matching_pos] = tmpNum
-    #     tempEventTypes[matching_pos] = tmpEv
-    #     if tmpEv == 'I':
-    #         numI += tmpNum
-    #     elif tmpEv == 'D':
-    #         numD += tmpNum
-
-    #     current_str_pos += regmatch_obj[0].rm_eo
-    #     matching_pos += 1
-
-    #     regex_res = regexec(&regex_obj, cigarstring[current_str_pos:], 1, regmatch_obj, 0)
-
     matches.numHits = matching_pos
     matches.eventLengths = tempEventCounts
     matches.eventTypes = tempEventTypes
     matches.totalIns = numI
     matches.totalDel = numD
-    # regfree(&regex_obj)
 
     return matches
 
@@ -120,36 +77,49 @@ cdef void extract_algn_seq(
     regex_result cigar,
     int min_pos,
     int max_pos,
-    int strLen,
     char **result,
     int **insPosInfo,
     int *currIndStore,
-    char edgeGap
+    char edgeGap,
+    char *qualityFiller,
+    char *sequenceFiller,
+    int refLen,
+    int longestSequenceLengthFound
 ):
-    cdef int ind, seqP=0, refP = pos, endPos = pos + strLen + cigar.totalDel - cigar.totalIns
+    cdef int refP = pos;  # position of REFERENCE
+    cdef int ind, seqP=0;
     cdef char evt
     cdef int nevt
     cdef int ntmptmp, ntmp
     cdef DTYPE_str_t tmp
-    cdef int currInd = 0
+    cdef int currInd = 0  # position of READ
     cdef int startP, finalP, adjust
-
-    if max_pos < min_pos:
-        max_pos = endPos
 
     seqLen = max_pos - min_pos + 1
 
-    cdef char *sf = <char*>malloc(seqLen * sizeof(char))
-    cdef char *qf = <char*>malloc(seqLen * sizeof(char))
-    cdef char *sI = <char*>malloc(cigar.totalIns * sizeof(char))
-    cdef char *qI = <char*>malloc(cigar.totalIns * sizeof(char))
-    cdef int *iP = <int *>malloc(cigar.totalIns * sizeof(int))
+    cdef char *sf = result[0]  #<char*>malloc(seqLen * sizeof(char))
+    cdef char *qf = result[1]  #<char*>malloc(seqLen * sizeof(char))
+    cdef char *sI = result[2]  #<char*>malloc(cigar.totalIns * sizeof(char))
+    cdef char *qI = result[3]  #<char*>malloc(cigar.totalIns * sizeof(char))
+    cdef int *iP = insPosInfo[0]  #<int *>malloc(cigar.totalIns * sizeof(int))
     cdef int insInd=0, tmpIns=0
+
+    if pos > max_pos:
+        # situtations where the entire read of interest/alignment STARTS AFTER the max_pos we want
+        # assert False, ('b', pos, max_pos)
+        substring(sf, sequenceFiller, 0, currInd, max_pos - min_pos + 1)
+        substring(qf, qualityFiller, 0, currInd, max_pos - min_pos + 1)
+        currInd += max_pos - min_pos + 1
+        currIndStore[0] = currInd
+        currIndStore[1] = insInd
+        return
 
     if pos > min_pos:
         # alignmennt started after min pos, so add edge gaps  (i.e. '-', or '', or '$')
-       add_gaps(sf, edgeGap, currInd, pos - min_pos)
-       add_gaps(qf, "!", currInd, pos - min_pos)
+       # assert pos - min_pos > 0, ('unexp pos here', pos, min_pos)
+       # assert pos - min_pos < longestSequenceLengthFound, ('f too long', max_pos, min_pos, pos, pos - min_pos)
+       substring(sf, sequenceFiller, 0, currInd, pos - min_pos)
+       substring(qf, qualityFiller, 0, currInd, pos - min_pos)
        currInd += (pos - min_pos)
 
     for ind in range(cigar.numHits):
@@ -167,7 +137,9 @@ cdef void extract_algn_seq(
                     seqP += nevt - adjust
                     refP += nevt - adjust
                     nevt = adjust
-
+            # assert currInd >= 0, ('b', currInd, nevt)
+            # assert currInd + nevt < longestSequenceLengthFound, ('a', currInd, nevt, longestSequenceLengthFound)
+            # assert seqP + nevt <= refLen, (seqP, nevt, refLen)
             substring(sf, seq, seqP, currInd, nevt)
             substring(qf, qual, seqP, currInd, nevt)
             refP += nevt
@@ -190,8 +162,8 @@ cdef void extract_algn_seq(
                 else:
                     refP += nevt - adjust
                     nevt = adjust
-            add_gaps(sf, "-", currInd, nevt)
-            add_gaps(qf, "!", currInd, nevt)
+            add_gaps(sf, '-', currInd, nevt)
+            add_gaps(qf, '!', currInd, nevt)
             currInd += nevt
             refP += nevt
         elif evt == 'N':
@@ -203,8 +175,8 @@ cdef void extract_algn_seq(
                 else:
                     refP += nevt - adjust
                     nevt = adjust
-            add_gaps(sf, "-", currInd, nevt)
-            add_gaps(qf, "!", currInd, nevt)
+            add_gaps(sf, '-', currInd, nevt)
+            add_gaps(qf, '!', currInd, nevt)
             currInd += nevt
             refP += nevt
         elif evt == 'S':
@@ -213,24 +185,23 @@ cdef void extract_algn_seq(
             print('DIDNT FIX hard clipping', evt)
             pass
         else:
-            print('Unexpected error/event!!', evt)
-            # raise Exception()
+            assert True, ('Unexpected error/event!!...was this sequence skipped??', evt)
+            raise Exception()
 
-    # print(refP, max_pos)
+    if (refP < min_pos):
+        # situtations where the entire read of interest/alignment ENDS before the min_pos we want
+        refP = min_pos
+
+    # print(refP, max_pos, currInd, seqLen, currInd + max_pos - refP, max_pos - refP + 1)
     if refP <= max_pos:
-        # alignmnet ended before max position, so add edge gaps. i.e. ('-', '', '$')
-        add_gaps(sf, edgeGap, currInd, max_pos - refP + 1)
-        add_gaps(qf, "!", currInd, max_pos - refP + 1)
+        # alignment ended before max position, so add edge gaps. i.e. ('-', '', '$')
+        substring(sf, sequenceFiller, 0, currInd, max_pos - refP + 1)
+        substring(qf, qualityFiller, 0, currInd, max_pos - refP + 1)
         currInd += max_pos - refP + 1
     elif refP > max_pos + 1:
+        # assert False, ('a', refP, max_pos, (refP - max_pos - 1))
         currInd -= (refP - max_pos - 1)
-
-    result[0] = sf
-    result[1] = qf
-    result[2] = sI
-    result[3] = qI
-    insPosInfo[0] = iP
-
+    # assert currInd == 4738, (pos, refP, currInd, max_pos, max_pos - min_pos + 1)
     currIndStore[0] = currInd
     currIndStore[1] = insInd
 
@@ -257,8 +228,10 @@ cpdef df_to_algn_arr(
     np.ndarray indexes,
     int min_pos = -1,
     int max_pos = -2,
-    char edge_gap = '-'
+    char edge_gap = '-',
+    char null_quality = '!'
 ):
+
     cdef Py_ssize_t nSeq = seqs.shape[0], ind
     cdef int pI, passedSeq=0, insCounter=0, tmpInsPosMarker;
     cdef char **seqR = <char**>malloc(4 * sizeof(char*))
@@ -269,41 +242,62 @@ cpdef df_to_algn_arr(
     currIndArr[1] = 0
     cdef seqList = [], qualList = []
 
-    cdef regex_result *match_vec = <regex_result*>malloc(nSeq * sizeof(regex_result))
-    cdef int maxPosStore = 0, tmpPosStore = 0, minPosStore = pos[0]
+    cdef regex_result *match_vec = <regex_result*>malloc(nSeq * (3 * sizeof(int) + 1 * sizeof(int*) + 1 * sizeof(char*) + 1 * sizeof(regex_result)))
+    cdef int maxPosStore = 0, tmpPosStore = 0, minPosStore = pos[0], maxTotalIns = 0;
     cdef multiindex_val = [], insData = [], successfullIndexes = []
+    cdef int longestSequenceLengthFound
 
     for ind in range(nSeq):
         match_vec[ind] = cigar_breakdown(cigars[ind].encode(), len(cigars[ind]))
         tmpPosStore = pos[ind] + len(seqs[ind]) + match_vec[ind].totalDel - match_vec[ind].totalIns - 1
+        if (match_vec[ind].totalIns > maxTotalIns):
+            maxTotalIns = match_vec[ind].totalIns
         if (tmpPosStore > maxPosStore):
-            maxPosStore = tmpPosStore
+           maxPosStore = tmpPosStore
         if (minPosStore > pos[ind]):
-            minPosStore = pos[ind]
+           minPosStore = pos[ind]
 
-    if (min_pos < 0):
+    if  (min_pos == -1): # (min_pos < 0):
         # assume its not defined by user....
         min_pos = minPosStore
 
-    if (min_pos > max_pos):
+    if  (max_pos == -2):  # (min_pos > max_pos):
         # assume its not defined by user ....
         max_pos = maxPosStore
+
+    longestSequenceLengthFound = maxPosStore - minPosStore + 1
+
+    cdef char *qEmpty = <char*>malloc(longestSequenceLengthFound * sizeof(char))  # this is the absolute
+    cdef char *sEmpty = <char*>malloc(longestSequenceLengthFound * sizeof(char))
+
+    for ind in range(longestSequenceLengthFound):
+        qEmpty[ind] = null_quality
+        sEmpty[ind] = edge_gap
+
+    seqR[0] = <char*>malloc(longestSequenceLengthFound * sizeof(char))
+    seqR[1] = <char*>malloc(longestSequenceLengthFound * sizeof(char))
+    seqR[2] = <char*>malloc(maxTotalIns * sizeof(char))
+    seqR[3] = <char*>malloc(maxTotalIns * sizeof(char))
+    insPosInfo[0] = <int*>malloc(maxTotalIns * sizeof(int))
 
     for ind in range(nSeq):
         if (cigars[ind][0] == '*' and len(cigars[ind]) == 1):
             continue
         extract_algn_seq(
-             seqs[ind].encode(),
-             quals[ind].encode(),
-             pos[ind],
-             match_vec[ind],
-             min_pos,
-             max_pos,
-             len(seqs[ind]),
-             seqR,
-             insPosInfo,
-             currIndArr,
-             edge_gap
+            seqs[ind].encode(),
+            quals[ind].encode(),
+            pos[ind],
+            match_vec[ind],
+            min_pos,
+            max_pos,
+            seqR,
+            insPosInfo,
+            currIndArr,
+            edge_gap,
+            qEmpty,
+            sEmpty,
+            len(seqs[ind]),
+            longestSequenceLengthFound
         )
 
         successfullIndexes.append(indexes[ind])
@@ -349,13 +343,17 @@ cpdef df_to_algn_arr(
                     ]
                 )
         passedSeq += 1
-        free(seqR[0])
-        free(seqR[1])
-        free(seqR[2])
-        free(seqR[3])
 
+    free(seqR[0])
+    free(seqR[1])
+    free(seqR[2])
+    free(seqR[3])
+    free(insPosInfo[0])
+    free(insPosInfo)
     free(match_vec)
     free(seqR)
+    free(qEmpty)
+    free(sEmpty)
 
     seq_table = np.array(seqList, dtype='S').view('S1').reshape(passedSeq, -1)
     qual_table = np.array(qualList, dtype='S').view('S1').reshape(passedSeq, -1)
