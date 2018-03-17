@@ -6,6 +6,7 @@ from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, 
 from ..xarray_mods import st_merge
 from . import numpy_ops
 import warnings
+import copy
 import numpy as np
 import pandas as pd
 import scipy
@@ -56,20 +57,20 @@ def from_df(*args, **kwargs):
     convert a pandas dataframe containing sequences, quality scores, and or cigar strings into a seq tables object
     """
     new_st = SeqTable(df_to_dataarray(*args, **kwargs))
-    new_st.update_attributes()
+    # new_st.update_attributes()
     return new_st
 
 
 def from_list(*args, **kwargs):
     new_st = SeqTable(seqs_to_datarray(*args, **kwargs))
-    new_st.update_attributes()
+    # new_st.update_attributes()
     return new_st
 
 
 def merge_seqs(*args, **kwargs):
     xarr = st_merge.st_merge_arrays(*args, **kwargs)
     new_st_tab = SeqTable(xarr)
-    new_st_tab.update_attributes()
+    # new_st_tab.update_attributes()
     return new_st_tab
 
 
@@ -120,28 +121,98 @@ class SeqTable(xr.DataArray):
         >>> sq = read_fastq('fastqfile.fq')
     """
 
-    phred_adjust = 33
-    fill_na_val = 'N'
-    null_qual = '!'
-    insertions = None
-    seq_type = None
-    has_quality = None
-    encoding_setting = (True, 'utf-8')
-
     def __init__(self, seq_list, *args, **kwargs):
         if isinstance(seq_list, list) or isinstance(seq_list, np.ndarray) or isinstance(seq_list, pd.Series):
             xarr = seqs_to_datarray(seq_list, *args, **kwargs)
             super(SeqTable, self).__init__(xarr)  # data_vars=arrs, attrs=attrs)
-            self.update_attributes()
+            # self.update_attributes()
         else:
             super(SeqTable, self).__init__(seq_list, *args, **kwargs)
 
-    def update_attributes(self):
-        self.phred_adjust = self.attrs['seqtable'].get('phred_adjust', 33)
-        self.fill_na_val = self.attrs['seqtable'].get('fill_na', 'N')
-        self.insertions = self.attrs['seqtable'].get('insertions')
-        self.seq_type = self.attrs['seqtable'].get('seq_type')
-        self.has_quality = 'quality' in self.type.values
+    # def update_attributes(self):
+    #     self.phred_adjust = self.attrs['seqtable'].get('phred_adjust', 33)
+    #     self.fill_na_val = self.attrs['seqtable'].get('fill_na', 'N')
+    #     self.insertions = self.attrs['seqtable'].get('insertions')
+    #     self.seq_type = self.attrs['seqtable'].get('seq_type')
+    #     self.has_quality = 'quality' in self.type.values if hasattr(self, 'type') else False
+
+    # def _copy_attributes(self, new):
+    #     if hasattr(self, 'phred_adjust'):
+    #         new.phred_adjust = self.phred_adjust
+    #     if hasattr(self, 'fill_na_val'):
+    #         new.fill_na_val = self.fill_na_val
+    #     if hasattr(self, 'insertions'):
+    #         new.insertions = self.insertions
+    #     if hasattr(self, 'seq_type'):
+    #         new.seq_type = self.seq_type
+    #     if hasattr(self, 'has_quality'):
+    #         new.has_quality = self.has_quality
+    #     if hasattr(self, 'attrs'):
+    #         new.attrs = copy.deepcopy(self.attrs)
+
+    def _has_attrs(self):
+        if 'seqtable' not in self.attrs:
+            warnings.warn('This object does not appear to be a seqtable object. maybe its just a datarray object?')
+
+    @property
+    def loc(self):
+        sliced = xr.DataArray.loc.fget(self)
+        # self._copy_attributes(sliced)
+        # TO DO: FILTER OUT INSERTIONS BASED ON THE READS, POSITIONS, AND DATATYPE RETURNED BY LOC
+        return sliced
+
+    def __getitem__(self, *args, **kwargs):
+        sliced = xr.DataArray.__getitem__(self, *args, **kwargs)
+        # TO DO: FILTER OUT INSERTIONS BASED ON THE READS, POSITIONS, AND DATATYPE RETURNED BY LOC
+        return sliced
+
+    def isel(self, *args, **kwargs):
+        sliced = xr.DataArray.isel(self, *args, **kwargs)
+        # TO DO: FILTER OUT INSERTIONS BASED ON THE READS, POSITIONS, AND DATATYPE RETURNED BY LOC
+        return sliced
+
+    def sel(self, *args, **kwargs):
+        sliced = xr.DataArray.sel(self, *args, **kwargs)
+        # TO DO: FILTER OUT INSERTIONS BASED ON THE READS, POSITIONS, AND DATATYPE RETURNED BY LOC
+        return sliced
+
+    @property
+    def phred_adjust(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('phred_adjust', 33)
+
+    @property
+    def fill_na_val(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('fill_na_val', 'N')
+
+    @property
+    def null_qual(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('null_qual', '!')
+
+    @property
+    def insertions(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('insertions', None)
+
+    @property
+    def seq_type(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('seq_type', None)
+
+    @property
+    def has_quality(self):
+        self._has_attrs()
+        if hasattr(self, 'type') is False:
+            warnings.warn('This object does not appear to have a type attribute. We expected a dimension to be labelled as type. Maybe its just a datarray object?')
+            return False
+        return 'quality' in self.type.values
+
+    @property
+    def encoding_setting(self):
+        self._has_attrs()
+        return self.attrs.get('seqtable', {}).get('encoding_setting', (True, 'utf-8'))
 
     def get_sequences(self):
         """
@@ -238,7 +309,7 @@ class SeqTable(xr.DataArray):
                 ins_table['seq']
             ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
 
-        # realign column sin table so that insertion bases are in the proper position with respect to referene positoins
+        # realign column sin table so that insertion bases are in the proper position with respect to referene positions
         cols = list(seqs_with_ins.columns)
         sorted_column_indicies = sorted(
             range(len(cols)),
@@ -296,9 +367,12 @@ class SeqTable(xr.DataArray):
                     }
                 )
 
-    def slice_sequences(self, positions, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0):
+    def slice_sequences(self, positions=None, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0):
         if empty_chars is None:
             empty_chars = self.fill_na_val
+
+        if positions is None:
+            positions = self.position.values
 
         positions = OrderedSet(list(positions))
 
@@ -306,9 +380,9 @@ class SeqTable(xr.DataArray):
         missing_pos = positions - set(self.position.values)
 
         if len(missing_pos) > 0:
-            new_positions = list(positions & set(self.positions.values))
+            new_positions = list(positions & set(self.position.values))
             prepend = ''.join([empty_chars for p in positions if p < self.position.values.min()])
-            append = ''.join([empty_chars for p in positions if p > self.positions.values.max()])
+            append = ''.join([empty_chars for p in positions if p > self.position.values.max()])
             positions = new_positions
             warnings.warn("The sequences do not cover all positions requested. {0}'s will be appended and prepended to sequences as necessary".format(empty_chars))
         else:
@@ -371,8 +445,7 @@ class SeqTable(xr.DataArray):
         # random_sequences = self.seq_df.sample(numseqs)
         return self.isel(read=list(np.random.choice(self.shape[0], numseqs, replace=replace)))
 
-    @classmethod
-    def _align_ref_seqs(cls, reference_seqs, ref_seq_positions, reference_seq_ids=None):
+    def _align_ref_seqs(self, reference_seqs, ref_seq_positions, reference_seq_ids=None):
         if isinstance(reference_seqs, string_types):
             reference_seqs = [reference_seqs]
         else:
@@ -389,10 +462,10 @@ class SeqTable(xr.DataArray):
         # if ref_seq_positions is None:
         #     # assume that the position of the reference sequences are already lined up to the reference sequence
         #     ref_seq_positions = self.position.values[:max_seq_len]
-        ref_seq_positions = ref_seq_positions[:max_seq_len]
+        ref_seq_positions = list(ref_seq_positions)[:max_seq_len]
 
         # print(reference_seqs)
-        return seqs_to_datarray(reference_seqs, seq_type=cls.seq_type)
+        return seqs_to_datarray(reference_seqs, pos=ref_seq_positions, seq_type=self.seq_type).sel(type='seq')
 
     @classmethod
     def _get_positions(cls, set_diff, p1, p2, positions_to_compare=None):
@@ -485,11 +558,11 @@ class SeqTable(xr.DataArray):
         if ref_seq_positions is None:
             # assume that the position of the reference sequences are already lined up to the reference sequence
             ref_seq_positions = self.position.values
-
+        # print(ref_seq_positions)
         reference_seqs = self._align_ref_seqs(reference_seqs, ref_seq_positions, reference_seq_ids)
-
+        # print(reference_seqs.position)
         positions_to_compare = self._get_positions(set_diff, self.position.values, reference_seqs.position.values, positions_to_compare)
-
+        # print(positions_to_compare)
         res = numpy_ops.compare_sequence_matrices(
             self.loc[:, positions_to_compare, 'seq'].values, reference_seqs.loc[:, positions_to_compare].values, flip,
             treat_as_match, ignore_characters, return_num_bases
@@ -596,7 +669,7 @@ class SeqTable(xr.DataArray):
         dist = numpy_ops.numpy_value_counts_bin_count(seq_dist_arr, weight_by)   # compare.apply(pd.value_counts).fillna(0)
 
         if include_insertion_counts:
-            insertion_events = self.get_insertion_events(positions=None, include_empty_positions=False, min_quality=0)
+            insertion_events = self.get_insertion_events(positions=positions, include_empty_positions=False, min_quality=0)
             dist = pd.concat([dist, pd.DataFrame(insertion_events.values, index=insertion_events.index, columns=[ord('^')]).T])
 
         dist.rename({c: chr(c) for c in list(dist.index)}, columns={i: c for i, c in enumerate(positions)}, inplace=True)
@@ -958,7 +1031,7 @@ class SeqTable(xr.DataArray):
         if remove_from_insertions and 'insertions' in meself.attrs.get('seqtable', {}):
             ins_df = meself.attrs.get('seqtable', {}).get('insertions')
             ins_df = ins_df[ins_df['quality'].values >= q]
-            meself.insertions = ins_df
+            #meself.insertions = ins_df
             meself.attrs['seqtable']['insertions'] = ins_df
 
         if inplace is False:
@@ -987,7 +1060,7 @@ class SeqTable(xr.DataArray):
             bkst_freq = None
         return relative_entropy(dist, self.seq_type, bkst_freq)
 
-    def get_quality_dist(self, positions=None, bins='fastqc', exclude_null_quality=True, sample=None, percentiles=[10, 25, 50, 75, 90], stats=['mean', 'median', 'max', 'min'], plotly_sampledata_size=20, use_multiindex=True):
+    def get_quality_dist(self, positions=None, bins='even', exclude_null_quality=True, sample=None, percentiles=[10, 25, 50, 75, 90], stats=['mean', 'median', 'max', 'min'], plotly_sampledata_size=20, use_multiindex=True):
         """
             Returns the distribution of quality across the given sequence, similar to FASTQC quality seq report.
 
@@ -1030,8 +1103,11 @@ class SeqTable(xr.DataArray):
         """
         assert 'quality' in self.type.values
 
+        if positions is None:
+            positions = list(self.position.values)
+
         return numpy_ops.get_quality_dist(
-            self.sel(type='quality').values.view(np.uint8) - self.phred_adjust, self.position.values,
+            self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust, positions,
             bins, exclude_null_quality, sample, percentiles, stats, plotly_sampledata_size, use_multiindex
         )
 
@@ -1203,6 +1279,6 @@ class SeqTable(xr.DataArray):
 
         seq = (cons_bases).view('S' + str(len(cols)))[0]
         if return_column_positions is True:
-            return seq, merged_dist.columns
+            return seq, cols
         else:
             return seq

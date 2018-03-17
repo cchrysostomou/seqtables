@@ -45,6 +45,7 @@ def compare_sequence_matrices(seq_arr1, seq_arr2, flip=False, treat_as_match=[],
 
         Returns: NxPxM array of boolean values
     """
+
     assert seq_arr1.shape[1] == seq_arr2.shape[1], 'Matrices do not match!'
 
     # use np.int8 because it ends upbeing faster
@@ -90,7 +91,8 @@ def compare_sequence_matrices(seq_arr1, seq_arr2, flip=False, treat_as_match=[],
         diff_arr = diff_arr.astype(np.float)
         diff_arr[ignore_pos] = np.nan
 
-    diff_arr = diff_arr[0]
+    diff_arr = diff_arr
+
     if return_num_bases:
             num_bases = np.apply_along_axis(
                 arr=diff_arr,
@@ -133,7 +135,7 @@ def numpy_value_counts_bin_count(arr, weights=None):
 
 
 def get_quality_dist(
-    arr, col_names=None, bins='fastqc', exclude_null_quality=True, sample=None,
+    arr, col_names=None, bins='even', exclude_null_quality=True, sample=None,
     percentiles=[10, 25, 50, 75, 90], stats=['mean', 'median', 'max', 'min'],
     plotly_sampledata_size=20, use_multiindex=True,
 ):
@@ -194,11 +196,12 @@ def get_quality_dist(
         col_names = np.arange(1, arr.shape[1] + 1)
     else:
         assert len(col_names) == arr.shape[1], 'Column names does not match shape'
+    # print(bins)
 
     if bins is 'fastqc':
         # use default bins as defined by fastqc report
         bins = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9,
+            (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9),
             (10, 14), (15, 19), (20, 24), (25, 29), (30, 34), (35, 39), (40, 44), (45, 49), (50, 54), (55, 59), (60, 64),
             (65, 69), (70, 74), (80, 84), (85, 89), (90, 94), (95, 99),
             (100, 104), (105, 109), (110, 114), (115, 119), (120, 124), (125, 129), (130, 134), (135, 139), (140, 144), (145, 149), (150, 154), (155, 159), (160, 164), (165, 169), (170, 174), (175, 179), (180, 184), (185, 189), (190, 194), (195, 199),
@@ -213,13 +216,17 @@ def get_quality_dist(
             c1 = col_names[x]
             c2 = col_names[min(x + binsize - 1, arr.shape[1] - 1)]
             bins.append((c1, c2))
+        # print(bins)
     else:
         # just in case its a generator (i.e. range function)
         # convert floats to ints, otherwise keep original
-        bins = [int(x) if isinstance(x, float) else x for x in bins]
+        bins = [(int(x), int(x)) if isinstance(x, float) else x if isinstance(x, tuple) else (x, x) for x in bins]
 
     binnames = OrderedDict()
+
     for b in bins:
+        if b[0] < min(col_names) or b[0] > max(col_names):
+            continue
         # create names for each bin
         if isinstance(b, int):
             binnames[str(b)] = (b, b)

@@ -7,6 +7,7 @@ import warnings
 from collections import defaultdict
 from ..utils.alphabets import dna_alphabet, aa_alphabet, all_dna, all_aa
 from .sam_to_arr import df_to_algn_arr
+import copy
 
 
 def strseries_to_bytearray(series, fillvalue='N', use_encoded_value=True):
@@ -328,7 +329,7 @@ def _seqs_to_datarray(
     if isinstance(pos, int):
         pos_arr = np.arange(pos, pos + seq_arr.shape[1])
     elif isinstance(pos, list) or isinstance(pos, np.array):
-        pos_arr = list(pos.copy())
+        pos_arr = list(copy.deepcopy(pos))
         for i, p in enumerate(range(len(pos), seq_arr.shape[1])):
             # add extra values for pos
             warnings.warn('Warning adding additional positions for reference: ' + ref_name)
