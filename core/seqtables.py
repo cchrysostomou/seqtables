@@ -465,7 +465,7 @@ class SeqTable(xr.DataArray):
         ref_seq_positions = list(ref_seq_positions)[:max_seq_len]
 
         # print(reference_seqs)
-        return seqs_to_datarray(reference_seqs, pos=ref_seq_positions, seq_type=self.seq_type).sel(type='seq')
+        return seqs_to_datarray(reference_seqs, pos=ref_seq_positions, index=np.array(list(reference_seq_ids)), seq_type=self.seq_type).sel(type='seq')
 
     @classmethod
     def _get_positions(cls, set_diff, p1, p2, positions_to_compare=None):
@@ -559,7 +559,9 @@ class SeqTable(xr.DataArray):
             # assume that the position of the reference sequences are already lined up to the reference sequence
             ref_seq_positions = self.position.values
         # print(ref_seq_positions)
+
         reference_seqs = self._align_ref_seqs(reference_seqs, ref_seq_positions, reference_seq_ids)
+
         # print(reference_seqs.position)
         positions_to_compare = self._get_positions(set_diff, self.position.values, reference_seqs.position.values, positions_to_compare)
         # print(positions_to_compare)
@@ -572,12 +574,17 @@ class SeqTable(xr.DataArray):
         # print(res[0].shape, res.shape, self.read.values.shape, len(positions_to_compare), reference_seqs.read.values.shape)
         xrtmp = xr.DataArray(
             res[0] if return_num_bases is True else res, dims=(names[0], 'position', names[1]),
-            # coords={names[0]: self.read.values, 'position': positions_to_compare, names[1]: reference_seqs.read.values}
+            coords={names[0]: self.read.values, 'position': positions_to_compare, names[1]: reference_seqs.read.values}
         )
 
         if return_as_dataframe:
             xrtmp = xrtmp.stack(z=(names[0], names[1])).T
-            xrtmp = pd.DataFrame(xrtmp.values, columns=pd.Index(xrtmp.position, name='position'), index=pd.MultiIndex.from_tuples(xrtmp.z.values, names=names))
+            xrtmp = pd.DataFrame(
+                xrtmp.values, columns=pd.Index(
+                    xrtmp.position, name='position'
+                ),
+                index=pd.MultiIndex.from_tuples(xrtmp.z.values, names=names)
+            )
 
         if return_num_bases is True:
             return xrtmp, res[1]
@@ -587,7 +594,7 @@ class SeqTable(xr.DataArray):
     def hamming_distance(
             self, reference_seqs, positions_to_compare=None, ref_seq_positions=None,
             set_diff=False, ignore_characters=[], treat_as_match=[], normalized=False,
-            names=None, return_as_dataframe=True
+            names=None, return_as_dataframe=True, reference_seq_ids=None
     ):
         """
             Determine hamming distance of all sequences in dataframe to a reference sequence.
@@ -608,14 +615,14 @@ class SeqTable(xr.DataArray):
             diffs, bases = self.compare_to_references(
                 reference_seqs, positions_to_compare, ref_seq_positions,
                 flip=True, set_diff=set_diff, ignore_characters=ignore_characters,
-                names=names, return_num_bases=True, return_as_dataframe=return_as_dataframe,
+                names=names, return_num_bases=True, return_as_dataframe=return_as_dataframe, reference_seq_ids=reference_seq_ids
             )
             hamming_result = ((diffs.sum(axis=1) / bases))
         else:
             hamming_result = self.compare_to_references(
                 reference_seqs, positions_to_compare, ref_seq_positions,
                 flip=True, set_diff=set_diff, ignore_characters=ignore_characters,
-                names=names, return_as_dataframe=return_as_dataframe
+                names=names, return_as_dataframe=return_as_dataframe, reference_seq_ids=reference_seq_ids
             ).sum(axis=1)
 
         if return_as_dataframe:
