@@ -377,10 +377,10 @@ class SeqTable(xr.DataArray):
         positions = OrderedSet(list(positions))
 
         # confirm that all positions are present in the column
-        missing_pos = positions - set(self.position.values)
+        missing_pos = positions - OrderedSet(self.position.values)
 
         if len(missing_pos) > 0:
-            new_positions = list(positions & set(self.position.values))
+            new_positions = list(positions & OrderedSet(self.position.values))
             prepend = ''.join([empty_chars for p in positions if p < self.position.values.min()])
             append = ''.join([empty_chars for p in positions if p > self.position.values.max()])
             positions = new_positions
@@ -472,16 +472,16 @@ class SeqTable(xr.DataArray):
         if set_diff is False:
             if positions_to_compare is None:
                 # only consider the intersection between reference_seqs and seqtable
-                positions_to_compare = list(set(list(p1)) & set(list(p2)))
+                positions_to_compare = list(OrderedSet(list(p1)) & OrderedSet(list(p2)))
             else:
                 # only consider the intersection between all positions
-                positions_to_compare = list(set(list(p1)) & set(list(p2)) & set(positions_to_compare))
+                positions_to_compare = list(OrderedSet(list(p1)) & OrderedSet(list(p2)) & OrderedSet(positions_to_compare))
         else:
             # change positions of interest to be the SET DIFFERENCE of positions parameter
-            overlapping_positions = list(set(list(p1)) & set(list(p2)))
+            overlapping_positions = list(OrderedSet(list(p1)) & OrderedSet(list(p2)))
             if positions_to_compare is None:
                 raise Exception('You cannot analyze the set-difference of all positions. Returns a non-informative answer (no columns to compare)')
-            positions_to_compare = sorted(list(set(overlapping_positions) - set(positions_to_compare)))
+            positions_to_compare = sorted(list(OrderedSet(overlapping_positions) - OrderedSet(positions_to_compare)))
 
         return positions_to_compare
 
@@ -502,8 +502,8 @@ class SeqTable(xr.DataArray):
 
     def _check_positions(self, positions):
         if not(positions is None):
-            s1 = set(list(self.position.values))
-            s2 = set(list(positions))
+            s1 = OrderedSet(list(self.position.values))
+            s2 = OrderedSet(list(positions))
             if s1.issuperset(s2) is False:
                 warnings.warn('Warning we cannot perform the request at all positions provided as they are undefined in this sequence table. \
                     The following positions will be ignored: {0}'.format(','.join([str(_) for _ in (s2 - s1)])))
@@ -614,14 +614,14 @@ class SeqTable(xr.DataArray):
         if normalized is True:
             diffs, bases = self.compare_to_references(
                 reference_seqs, positions_to_compare, ref_seq_positions,
-                flip=True, set_diff=set_diff, ignore_characters=ignore_characters,
+                flip=True, set_diff=set_diff, ignore_characters=ignore_characters, treat_as_match=treat_as_match,
                 names=names, return_num_bases=True, return_as_dataframe=return_as_dataframe, reference_seq_ids=reference_seq_ids
             )
             hamming_result = ((diffs.sum(axis=1) / bases))
         else:
             hamming_result = self.compare_to_references(
                 reference_seqs, positions_to_compare, ref_seq_positions,
-                flip=True, set_diff=set_diff, ignore_characters=ignore_characters,
+                flip=True, set_diff=set_diff, ignore_characters=ignore_characters, treat_as_match=treat_as_match,
                 names=names, return_as_dataframe=return_as_dataframe, reference_seq_ids=reference_seq_ids
             ).sum(axis=1)
 
@@ -662,8 +662,8 @@ class SeqTable(xr.DataArray):
                 raise Exception('The provided weights for each sequence must match the number of input sequences!')
 
         if not(positions is None):
-            s1 = set(list(self.position.values))
-            s2 = set(list(positions))
+            s1 = OrderedSet(list(self.position.values))
+            s2 = OrderedSet(list(positions))
             if s1.issuperset(s2) is False:
                 warnings.warn('Warning we cannot provide sequence letter distribution at all positions provided as they are undefined in this sequence table. \
                     The following positions will be ignored: {0}'.format(','.join([str(_) for _ in (s2 - s1)])))
@@ -681,7 +681,7 @@ class SeqTable(xr.DataArray):
 
         dist.rename({c: chr(c) for c in list(dist.index)}, columns={i: c for i, c in enumerate(positions)}, inplace=True)
 
-        drop_values = list(set(ignore_characters) & set(list(dist.index)))
+        drop_values = list(OrderedSet(ignore_characters) & OrderedSet(list(dist.index)))
         dist = dist.drop(drop_values, axis=0)
 
         if method == 'freq':
@@ -1165,7 +1165,7 @@ class SeqTable(xr.DataArray):
         ins_df = self._get_filtered_insertions_by_quality(min_quality).groupby(level=[1, 2]).apply(len).reset_index('loc_ins').rename(columns={0: 'counts'})
 
         if include_empty_positions:
-            missing_indexes = set(positions) - set(ins_df.index)
+            missing_indexes = OrderedSet(positions) - OrderedSet(ins_df.index)
             ins_df = pd.concat([ins_df, pd.DataFrame([np.nan] * len(missing_indexes), columns=['counts'], index=missing_indexes)]).sort_index()
             ins_df.index.name = 'position'
         else:
@@ -1180,7 +1180,7 @@ class SeqTable(xr.DataArray):
         ins_df = self.insertions.groupby(level=[1, 2]).quality.apply(np.mean).reset_index('loc_ins')
 
         if include_empty_positions:
-            missing_indexes = set(positions) - set(ins_df.index)
+            missing_indexes = OrderedSet(positions) - OrderedSet(ins_df.index)
             ins_df = pd.concat([ins_df, pd.DataFrame([np.nan] * len(missing_indexes), columns=['quality'], index=missing_indexes)]).sort_index()
             ins_df.index.name = 'position'
         else:

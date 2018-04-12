@@ -288,9 +288,9 @@ def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', '
         # lets make sure we are always adding chunks in in "pairs". this way we can hardcode our read_sam and assume that R1-R2 pairs are always following one another...
         # Will this break?
         chunks = 2 * (chunks / 2)
-        dfgen = pd.read_csv(file, sep='\t', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, chunksize=chunks, engine='c', quotechar=quoted_char)
+        dfgen = pd.read_csv(file, sep='\t', comment='@', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, chunksize=chunks, engine='c', quotechar=quoted_char)
     else:
-        dfgen = [pd.read_csv(file, sep='\t', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, nrows=nrows, engine='c', quotechar=quoted_char)]
+        dfgen = [pd.read_csv(file, sep='\t', comment='@', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, nrows=nrows, engine='c', quotechar=quoted_char)]
     # print(sam_column_names + opt_fields)
     total_reads = 0
     for df in dfgen:

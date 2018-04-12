@@ -107,7 +107,7 @@ def _seq_df_to_datarray(
         data=[
             df[map_cols['seqs']].values,
             df[map_cols['quals']].values if 'quals' in map_cols else np.array([]),
-            df[map_cols['pos']].values,
+            df[map_cols['pos']].astype(np.int).values,
             df[map_cols['cigar']].values,
             np.array(list(index))
         ],
