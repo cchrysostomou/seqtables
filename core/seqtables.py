@@ -299,14 +299,14 @@ class SeqTable(xr.DataArray):
                 columns=positions, index=self.read.values
             )
         else:
-            ins_table = filtered_insertion_table.unstack(level=(1, 2), fill_value=ord(ins_char))
+            ins_table_seq = filtered_insertion_table['seq'].unstack(level=(1, 2), fill_value=ord(ins_char))
 
             seqs_with_ins = pd.concat([
                 pd.DataFrame(
                     self.loc[:, positions, 'seq'].values.view(np.uint8),
                     columns=positions, index=self.read.values
                 ),
-                ins_table['seq']
+                ins_table_seq
             ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
 
         # realign column sin table so that insertion bases are in the proper position with respect to referene positions
@@ -324,17 +324,18 @@ class SeqTable(xr.DataArray):
         if include_quality is True:
             if filtered_insertion_table.shape[0] == 0:
                 quals_with_ins = pd.DataFrame(
-                    self.loc[:, positions, 'quality'].values.view(np.uint8),
+                    self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust,
                     columns=positions, index=self.read.values
                 )
             else:
+                ins_table_qual = filtered_insertion_table['quality'].unstack(level=(1, 2), fill_value=ord(self.null_qual) - self.phred_adjust)
                 quals_with_ins = pd.concat([
                     pd.DataFrame(
-                        self.loc[:, positions, 'quality'].values.view(np.uint8),
+                        self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust,
                         columns=positions, index=self.read.values
                     ),
-                    ins_table['quality']
-                ], axis=1).fillna(ord(self.null_qual)).astype(np.uint8)
+                    ins_table_qual
+                ], axis=1).fillna(ord(self.null_qual) - self.phred_adjust).astype(np.uint8)
 
             quals_with_ins = quals_with_ins.iloc[:, sorted_column_indicies]
             quals_with_ins.columns = renamed_cols
@@ -367,7 +368,7 @@ class SeqTable(xr.DataArray):
                     }
                 )
 
-    def slice_sequences(self, positions=None, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0):
+    def slice_sequences(self, positions=None, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True):
         if empty_chars is None:
             empty_chars = self.fill_na_val
 
@@ -394,27 +395,31 @@ class SeqTable(xr.DataArray):
         else:
             tmp_data = self.loc[:, positions]
 
+        if maintain_read_order is True:
+            # re-sort data
+            tmp_data = tmp_data.loc[self.read.values]
+
         num_chars = tmp_data.shape[1]
 
         if num_chars == 0:
             # nothing to return
             if return_quality:
                 qual_empty = self.null_qual * (len(prepend) + len(append))
-                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty}, columns=['seqs', 'quals'], index=self.index)
+                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty}, columns=['seqs', 'quals'], index=tmp_data.read.values)
             else:
-                return pd.DataFrame(prepend + append, columns=['seqs'], index=self.index)
+                return pd.DataFrame(prepend + append, columns=['seqs'], index=tmp_data.read.values)
 
         # slice data into sequences
         if 'type' in tmp_data.dims:
             substring = pd.DataFrame(
                 {
                     name: tmp_data.sel(type='seq').values.copy().view('S{0}'.format(num_chars)).ravel()
-                }, index=self.read.values
+                }, index=tmp_data.read.values
             )
         else:
             substring = pd.DataFrame({
                 name: tmp_data.values.copy().view('S{0}'.format(num_chars)).ravel()
-            }, index=self.read.values)
+            }, index=tmp_data.read.values)
 
         if prepend or append:
             substring['seqs'] = prepend + substring['seqs'] + append  # substring['seqs'].apply(lambda x: prepend + x + append)
@@ -426,11 +431,11 @@ class SeqTable(xr.DataArray):
                 prepend = self.null_qual * len(prepend)
                 append = self.null_qual * len(append)
                 substring['quals'] = prepend + substring['quals'] + append  # .apply(lambda x: prepend + x + append)
-
+        print(substring)
         if return_column_positions is True:
-            return substring, tmp_data.position.values
+            return substring.applymap(lambda x: x.decode()), tmp_data.position.values
         else:
-            return substring
+            return substring.applymap(lambda x: x.decode())
 
     def subsample(self, numseqs, replace=False):
         """
@@ -1274,17 +1279,21 @@ class SeqTable(xr.DataArray):
 
         merged_dist = merged_dist.iloc[:, sorted_column_indicies]
         below_cutoff = merged_dist.max(axis=0) <= merged_dist.sum(axis=0) * modecutoff
-        cons_bases = np.array(merged_dist.index.values, dtype='S1')[merged_dist.values.argmax(axis=0)]  # => use this rather than idx max because (a) its faster, and (b) it returns a numpy array with data type S1 rathr than object
+        cons_bases = np.array(merged_dist.index.values, dtype='U1')[merged_dist.values.argmax(axis=0)]  # => use this rather than idx max because (a) its faster, and (b) it returns a numpy array with data type S1 rathr than object
         cons_bases[below_cutoff] = 'N'
 
         if include_insertions is True and exclude_insertions_with_gap_cons is True:
             # lets figure out which are our insertion columns
             idx_ins_cols = [True if isinstance(c, tuple) else False for i, c in enumerate(merged_dist.columns)]
-            keep_cols = ~((cons_bases == '-') & idx_ins_cols)
+            # figure out which of the consensus bases are considered a gap
+            cons_is_del = [c == '-' for c in cons_bases]
+            # we only want to isolate either (1) not insertion positions, or (2) insertions positions tat do NOT have  gap
+            dont_want = np.array(idx_ins_cols) & np.array(cons_is_del)
+            keep_cols = ~dont_want
             cons_bases = cons_bases[keep_cols]
             cols = merged_dist.columns[keep_cols]
 
-        seq = (cons_bases).view('S' + str(len(cols)))[0]
+        seq = (cons_bases).view('U' + str(len(cols)))[0]
         if return_column_positions is True:
             return seq, cols
         else:

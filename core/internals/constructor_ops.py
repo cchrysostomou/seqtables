@@ -226,14 +226,17 @@ def _algn_seq_to_datarray(
 
     ins_data = aligned_arrs[4].view(np.uint8)
     if has_quality:
-        ins_data[:, 1] -= phred_adjust
+        if ins_data.shape[0] > 0:
+            ins_data[:, 1] -= phred_adjust
+        else:
+            ins_data = ins_data.reshape(0, 0)
 
     metadata = {
         'seq_type': seq_type,
         'fillna_val': fillna_val,
         'has_quality': has_quality,
         'insertions': pd.DataFrame(
-            ins_data,
+            ins_data if ins_data.shape[0] > 0 else None,
             index=inserted_base_index,
             columns=['seq', 'quality'] if has_quality else ['seq'],
         ),

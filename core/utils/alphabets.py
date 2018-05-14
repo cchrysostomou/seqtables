@@ -23,5 +23,5 @@ aa_degenerate = {
 dna_extra = ['-']
 aa_extra = ['-']
 
-all_dna = dna_alphabet + dna_degenerate.keys() + dna_extra
-all_aa = aa_alphabet + aa_degenerate.keys() + aa_extra
+all_dna = dna_alphabet + list(dna_degenerate.keys()) + dna_extra
+all_aa = aa_alphabet + list(aa_degenerate.keys()) + aa_extra
