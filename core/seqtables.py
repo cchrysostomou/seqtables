@@ -431,7 +431,7 @@ class SeqTable(xr.DataArray):
                 prepend = self.null_qual * len(prepend)
                 append = self.null_qual * len(append)
                 substring['quals'] = prepend + substring['quals'] + append  # .apply(lambda x: prepend + x + append)
-        print(substring)
+        # print(substring)
         if return_column_positions is True:
             return substring.applymap(lambda x: x.decode()), tmp_data.position.values
         else:

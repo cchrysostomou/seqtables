@@ -215,7 +215,7 @@ def filter_reads(df, ignore_hits=[], phix_filter=True, remove_indels=True, bits_
     return df, baddf, stats
 
 
-def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', 'seq', 'qual'], opt_fields_keep=['XN', 'XM', 'MD'], nrows=None, chunks=None, indexing_dict = None, ignore_quotes=True):
+def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', 'seq', 'qual'], opt_fields_keep=['XN', 'XM', 'MD'], nrows=None, chunks=None, indexing_dict = None, ignore_quotes=True, comment_out_letter=False):
     """
         Read a sam file for the first time and process the fields into a dataframe
 
@@ -272,6 +272,8 @@ def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', '
 
     # first check for comment lines at beginning
     num_skip = 0
+    total_cols = 0
+
     with open(file) as sb:
         for line in sb:
             if line.startswith('@'):
@@ -283,17 +285,20 @@ def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', '
     # opt_fields_keep = ['XN', 'XM', 'MD']
     num_optional_fields = total_cols - len(sam_column_names)
     opt_fields = ["opt_field_" + str(n + 1) for n in range(num_optional_fields)]
-
+    cout = '@' if comment_out_letter else None  # adding comment='@' does not work because of quality scores (they get commented out!)
     if chunks:
         # lets make sure we are always adding chunks in in "pairs". this way we can hardcode our read_sam and assume that R1-R2 pairs are always following one another...
         # Will this break?
         chunks = 2 * (chunks / 2)
-        dfgen = pd.read_csv(file, sep='\t', comment='@', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, chunksize=chunks, engine='c', quotechar=quoted_char)
+        dfgen = pd.read_csv(file, sep='\t', comment=cout, skiprows=num_skip, header=None, names=sam_column_names + opt_fields, chunksize=chunks, engine='c', quotechar=quoted_char)
     else:
-        dfgen = [pd.read_csv(file, sep='\t', comment='@', skiprows=num_skip, header=None, names=sam_column_names + opt_fields, nrows=nrows, engine='c', quotechar=quoted_char)]
+        dfgen = [pd.read_csv(file, sep='\t', comment=cout, skiprows=num_skip, header=None, names=sam_column_names + opt_fields, nrows=nrows, engine='c', quotechar=quoted_char)]
     # print(sam_column_names + opt_fields)
     total_reads = 0
     for df in dfgen:
+        if total_cols == 0:
+            yield pd.DataFrame([])
+            continue
         # print(df.iloc[0])
         total_reads += df.shape[0]
         optional_columns = [c for c in df.columns if c.startswith('opt_field')]
