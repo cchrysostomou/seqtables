@@ -90,15 +90,30 @@ def _seq_df_to_datarray(
     ref_pos_names = defaultdict(list, ref_pos_names)
 
     assert 'seqs' in map_cols, 'Error you must provide the column name for sequences'
+    # print(map_cols)
+    has_quality = 'quals' in map_cols and map_cols['quals'] in df.columns
+    # print(df.columns, map_cols['quals'], has_quality)
+    has_cigar = 'cigar' in map_cols and map_cols['cigar'] in df.columns
 
-    if 'cigar' not in map_cols:
+    assert 'pos' in map_cols
+
+    if map_cols['pos'] not in df.columns:
+        warnings.warn('Position column not found, automatically assuming sequences are aligned at position 1')
+        df[map_cols['pos']] = 1
+
+    assert 'seqs' in map_cols and map_cols['seqs'] in df.columns, 'Error cannot find the column corresponding to sequences: ' + map_cols['seqs'] + ',' + ':'.join(df.columns)
+    
+    if has_cigar is False:
         # no need to do any alignment, juse use seq to dtarr func
         return _seqs_to_datarray(
             df[map_cols['seqs']].values,
-            df[map_cols['quals']].values if 'quals' in map_cols else None,
+            df[map_cols['quals']].values if has_quality is True else None,
             pos=df[map_cols['pos']].values if 'pos' in map_cols else 1,
             index=list(index)
         )
+
+    if has_quality is False:
+        df[map_cols['quals']] = ''
 
     return _algn_seq_to_datarray(
         ref_name,
@@ -106,11 +121,12 @@ def _seq_df_to_datarray(
         phred_adjust=33,
         data=[
             df[map_cols['seqs']].values,
-            df[map_cols['quals']].values if 'quals' in map_cols else np.array([]),
+            df[map_cols['quals']].values,  # if has_quality is True else None, # np.array([]),
             df[map_cols['pos']].astype(np.int).values,
             df[map_cols['cigar']].values,
             np.array(list(index))
         ],
+        has_quality=has_quality,
         min_pos=min_pos,
         max_pos=max_pos,
         ref_to_pos_dim=ref_to_pos_dict[ref_name] if ref_name in ref_to_pos_dict else None
@@ -118,13 +134,13 @@ def _seq_df_to_datarray(
 
 
 def _algn_seq_to_datarray(
-    ref_name, seq_type, phred_adjust, data, ref_to_pos_dim=None, min_pos=-1, max_pos=-2, edge_gap='$', null_quality='!'
+    ref_name, seq_type, phred_adjust, data, has_quality, ref_to_pos_dim=None, min_pos=-1, max_pos=-2, edge_gap='$', null_quality='!'
 ):
     """
         Create sets of xarray dataarrays from the variable data
         data is assumed to be 5xN matrix where each element in data are as follows:
             1. sequences
-            2. qualities
+            2. qualities (this column is ignored in the output from df_to_algn_arr if has_quality is False)
             3. pos start
             4. cigar strings
     """
@@ -136,10 +152,9 @@ def _algn_seq_to_datarray(
     #     index = data[-1]
 
     # add in gaps and remove indels in cython fnc
-
     aligned_arrs = df_to_algn_arr(*data, edge_gap=ord(edge_gap), null_quality=ord(null_quality), min_pos=min_pos, max_pos=max_pos)  # , edgeGap='$')
 
-    has_quality = data[1].shape[0] > 0
+    # has_quality = data[1].shape[0] > 0
 
     seq_arr = aligned_arrs[0].astype('S1')
     # index = data[-1]
@@ -199,7 +214,7 @@ def _algn_seq_to_datarray(
 
     # create a dataarray for insertions
     inserted_base_index = pd.MultiIndex.from_tuples(
-        aligned_arrs[3],
+        aligned_arrs[3] or [(None, None, None)],
         names=(
             'read_ins',
             'position_ins',
@@ -225,6 +240,7 @@ def _algn_seq_to_datarray(
     # )
 
     ins_data = aligned_arrs[4].view(np.uint8)
+    
     if has_quality:
         if ins_data.shape[0] > 0:
             ins_data[:, 1] -= phred_adjust
