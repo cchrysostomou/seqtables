@@ -12,7 +12,7 @@ from scipy.stats import binom
 
 import pandas as pd
 
-from .utils.alphabets import aa_alphabet, dna_alphabet, all_aa, all_dna
+from seqtables.core.utils.alphabets import aa_alphabet, dna_alphabet, all_aa, all_dna
 
 amino_acid_color_properties = defaultdict(
     lambda: {"color": "#f1f2f1", "name": "Unknown"},
@@ -137,8 +137,8 @@ def draw_seqlogo_barplots(seq_dist, alphabet=None, label_cutoff=0.09, use_proper
     data = []
     if alphabet is None:
         letters = list(seq_dist.index)
-        alphabet = 'nt' if set(letters).subset(all_dna) else 'aa'
-
+        alphabet = 'nt' if set(letters).issubset(all_dna) else 'aa'
+        
     annotation = []
 
     if alphabet.lower() == 'nt':

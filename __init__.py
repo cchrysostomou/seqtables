@@ -5,7 +5,8 @@ except:
     SeqIO = False
     bio_installed = False
 
-from .core import seqtables
+from seqtables.core import seqtables
+from seqtables.core.seqtables import SeqTable
 
-from .xarray_mods.st_merge import st_merge_arrays
+from seqtables.xarray_mods.st_merge import st_merge_arrays
 

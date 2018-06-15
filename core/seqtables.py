@@ -1,10 +1,11 @@
 from __future__ import absolute_import
 # from ..internals import xarray_extensions
 import xarray as xr
-from .internals import _seq_df_to_datarray, _seqs_to_datarray
-from .seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, relative_entropy
-from ..xarray_mods import st_merge
-from . import numpy_ops
+from seqtables.core.internals import _seq_df_to_datarray, _seqs_to_datarray
+from seqtables.core.seq_logo import draw_seqlogo_barplots, get_bits, get_plogo, shannon_info, relative_entropy
+from seqtables.xarray_mods import st_merge
+from seqtables.core import numpy_ops
+from seqtables.core.utils.custom_sam_utils import read_sam
 import warnings
 import copy
 import numpy as np
@@ -15,17 +16,59 @@ from collections import defaultdict
 import itertools
 from orderedset import OrderedSet
 
+def df_to_dataarray(
+    df, 
+    seq_type, 
+    index, 
+    map_cols={'ref': 'rname', 'seqs': 'seq', 'quals': 'qual', 'cigar': 'cigar', 'pos': 'pos'},
+    ref_pos_names={},
+    ignore_ref_col=False,
+    ref_name='',
+    ref_to_pos_dict={},
+    min_pos=-1,
+    max_pos=-2,
+    user_attrs={}
+):
+    """
 
-def df_to_dataarray(df, seq_type, index, user_attrs={}, ref_name='', ref_to_pos_dict={}, min_pos=-1, max_pos=-2):
+    Converts a dataframe into seqtables format. It is assumed that the dataframe has columns which follows sam file specifications and defines the:
+        1. The sequence
+        2. The reference name
+        3. Quality score
+        4. Cigar string
+        5. Start position
+    
+    Args:
+        df (dataframe): dataframe converted from a sam file
+        map_cols (dict): dict defining how to map column names to the expected fields
+        ref_pos_names (dict): if defined, defines which references we want to define
+        ignore_ref_col (bool): If true, then will not use the reference column to define sequences
+        ref_name (string): Define the sequences with a reference
+        min_pos (default = -1): If > -1 then defines the minimum position allowed for alignment, all other aligned positions before min_pos will be trimmed
+
+            .. note::
+
+                For example, let an alignment start at position 1 as follows:
+                    AACGA 1
+                
+                If min_pos is 3 then the following sequence is returned
+                    CGA 
+        
+        max_pos (default = -2): If > 0 then defines the maximum position allowed for alignment
+        ref_to_pos_dict (dict): Allows user to custom name the 'position' dimension. If empty, then dimension is just 'position'
+    
+    Returns: 
+        xarray
+        attributes for xarray
+
     """
-        Converts a dataframe into an XARRAY object (not a seqtable)
-    """
+
     ignore_ref_col = True if ref_name else False
     arrs, attrs = _seq_df_to_datarray(
         df, seq_type, index, ignore_ref_col=ignore_ref_col, ref_name=ref_name, ref_to_pos_dict=ref_to_pos_dict,
-        min_pos=min_pos, max_pos=max_pos
+        min_pos=min_pos, max_pos=max_pos, map_cols=map_cols
     )
-    attrs['user_defined'] = user_attrs
+
     # return xr.Dataset(data_vars=arrs, attrs=attrs)
     return xr.DataArray(arrs, attrs=attrs, name=ref_name if ref_name else None)
 
@@ -50,21 +93,6 @@ def seqs_to_datarray(
 
     # return xr.Dataset(data_vars=arrs, attrs=attrs)
     return xr.DataArray(arrs, attrs=attrs, name=ref_name if ref_name else None)
-
-
-def from_df(*args, **kwargs):
-    """
-    convert a pandas dataframe containing sequences, quality scores, and or cigar strings into a seq tables object
-    """
-    new_st = SeqTable(df_to_dataarray(*args, **kwargs))
-    # new_st.update_attributes()
-    return new_st
-
-
-def from_list(*args, **kwargs):
-    new_st = SeqTable(seqs_to_datarray(*args, **kwargs))
-    # new_st.update_attributes()
-    return new_st
 
 
 def merge_seqs(*args, **kwargs):
@@ -120,6 +148,97 @@ class SeqTable(xr.DataArray):
         >>> sq.hamming_distance('AAA')
         >>> sq = read_fastq('fastqfile.fq')
     """
+
+    @classmethod
+    def from_df(cls, *args, **kwargs):
+        """
+
+            Converts a dataframe into seqtables format. It is assumed that the dataframe has columns which follows sam file specifications and defines the:
+                1. The sequence
+                2. The reference name
+                3. Quality score
+                4. Cigar string
+                5. Start position
+            
+            Args:
+                df (dataframe): dataframe converted from a sam file
+                map_cols (dict): dict defining how to map column names to the expected fields
+                ref_pos_names (dict): if defined, defines which references we want to define
+                ignore_ref_col (bool): If true, then will not use the reference column to define sequences
+                ref_name (string): Define the sequences with a reference
+                min_pos (default = -1): If > -1 then defines the minimum position allowed for alignment, all other aligned positions before min_pos will be trimmed
+
+                    .. note::
+
+                        For example, let an alignment start at position 1 as follows:
+                            AACGA 1
+                        
+                        If min_pos is 3 then the following sequence is returned
+                            CGA 
+                
+                max_pos (default = -2): If > 0 then defines the maximum position allowed for alignment
+                ref_to_pos_dict (dict): Allows user to custom name the 'position' dimension. If empty, then dimension is just 'position'
+            
+            Returns: 
+                xarray
+                attributes for xarray
+
+        """
+        new_st = SeqTable(df_to_dataarray(*args, **kwargs))
+        # new_st.update_attributes()
+        return new_st
+
+    @classmethod
+    def from_list(cls, *args, **kwargs):
+        new_st = SeqTable(seqs_to_datarray(*args, **kwargs))
+        # new_st.update_attributes()
+        return new_st
+
+    @classmethod
+    def from_sam(cls, sam_file_location, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', 'seq', 'qual'], opt_fields_keep=['XN', 'XM', 'MD'], nrows=None, chunks=None, indexing_dict = None, ignore_quotes=True, comment_out_letter=False, min_pos=-1, max_pos=-2, seq_type='NT'):
+        """
+            Returns an iterator that reads through a sam file using pysam and then returns results in seqtable format
+        """
+        samfile_reader = read_sam(sam_file_location, std_fields_keep, opt_fields_keep, nrows,chunks,indexing_dict,ignore_quotes,comment_out_letter)
+        for sam_df in samfile_reader:
+            yield SeqTable.from_df(sam_df[['seq', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos)
+
+    @classmethod
+    def from_pysam(cls, alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', min_pos=-1, max_pos=-2):
+        """
+            Returns an iterator that reads through a sam file using pysam and then returns results in seqtable format
+
+            Args:
+                alignment_file: iterator to pysam alignment file object
+                chunks (int): number of reads to import at a given time
+                fetch_args (list): positional arguments passed into psyam.fetch
+                fetch_kwargs (dict): keyword arguments passed into pysam.fetch
+
+            Returns:
+                Iterator to seqtable object                
+        """
+        samfile_reader = alignment_file.fetch(*fetch_args, **fetch_kwargs)
+        if chunks is None:
+            chunks = float('Inf')
+        
+        while True:
+            counter = 0
+            data = []
+
+            for read in samfile_reader:        
+                data.append((read.query_name, read.seq, read.qual, read.pos, read.cigarstring))
+                counter += 1
+                if counter == chunks:                    
+                    df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+                    yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos) 
+                    counter = 0
+                    data = []
+        
+        if len(data) > 0:
+            df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+            yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos) 
+            counter = 0
+            data = []
 
     def __init__(self, seq_list, *args, **kwargs):
         if isinstance(seq_list, list) or isinstance(seq_list, np.ndarray) or isinstance(seq_list, pd.Series):

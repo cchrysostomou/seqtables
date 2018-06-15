@@ -1,6 +1,6 @@
-from ..core import seqtables
+from seqtables import SeqTable
 import pandas as pd
-from ..__init__ import bio_installed, SeqIO
+from seqtables.__init__ import bio_installed, SeqIO
 import gc
 
 """
@@ -53,35 +53,35 @@ def read_fastq(input_file, limit=None, chunk_size=10000, use_header_as_index=Tru
             quals.append(r[3])
             if limit is not None and l > limit:
                 break
-    st = seqtable(seqs, quals, index=header, seqtype='NT')
+    st = SeqTable(seqs, quals, index=header, seqtype='NT')
     del seqs, quals, header
     gc.collect()
     return st
 
 
-def read_sam(input_file, limit=None, chunk_size=100000, cleave_softclip=False, use_header_as_index=True, ignore_quotes=True):
-    """
-        Load a SAM file into class SeqTable
-    """
-    skiplines = 0
-    with open(input_file) as r:
-        for i in r:
-            if i[0] == '@':
-                skiplines += 1
-            else:
-                break
+# def read_sam(input_file, limit=None, chunk_size=100000, cleave_softclip=False, use_header_as_index=True, ignore_quotes=True):
+#     """
+#         Load a SAM file into class SeqTable
+#     """
+#     skiplines = 0
+#     with open(input_file) as r:
+#         for i in r:
+#             if i[0] == '@':
+#                 skiplines += 1
+#             else:
+#                 break
 
-    cols_to_use = [9, 10]
-    if use_header_as_index:
-        cols_to_use.append(0)
-        index_col = 0
-    else:
-        index_col = None
+#     cols_to_use = [9, 10]
+#     if use_header_as_index:
+#         cols_to_use.append(0)
+#         index_col = 0
+#     else:
+#         index_col = None
 
-    if cleave_softclip:
-        cols_to_use.append(5)
+#     if cleave_softclip:
+#         cols_to_use.append(5)
 
-    df = pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines, quotechar='\x07') if ignore_quotes else pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines)
+#     df = pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines, quotechar='\x07') if ignore_quotes else pd.read_csv(input_file, sep='\t', header=None, index_col=index_col, usecols=cols_to_use, skiprows=skiplines)
 
-    index = df.index
-    return seqtable(df[9], df[10], index=index, seq_type='NT')
+#     index = df.index
+#     return SeqTable(df, index=index, seq_type='NT')

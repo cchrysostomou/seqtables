@@ -2,6 +2,18 @@
 aa_alphabet = list('ACDEFGHIKLMNPQRSTVWY')
 dna_alphabet = list('ACTG')
 
+# M = match
+#  i = insertion
+#  d = deletion
+#  n = deletion but use '.' instead of '-'
+#  s = softclipping
+#  h = hardclipping
+#  p = padding, 
+#  = = sequence match
+#  X = sequence mismatch
+# B= move back (we wont consider this one for now)
+extended_cigar_alphabet = list("MIDNSHP=XB")
+
 dna_degenerate = {
     'U': list('UT'),
     'N': list('ACTG'),

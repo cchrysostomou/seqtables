@@ -1,0 +1,23 @@
+[[source]]
+verify_ssl = true
+url = "https://pypi.org/simple"
+name = "pypi"
+
+[packages]
+numexpr = "*"
+numpy = ">=1.13"
+jupyter = "*"
+pandas = ">=0.2"
+xarray = "*"
+matplotlib = "*"
+plotly = "*"
+regex = "*"
+orderedset = "*"
+Cython = "*"
+scipy = "*"
+pysam = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.5"

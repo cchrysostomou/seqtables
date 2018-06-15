@@ -39,7 +39,7 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     cdef char* tempEventTypes = <char *>malloc(strLen * sizeof(char))
     cdef int regex_res = 0, current_str_pos = 0, matching_pos = 0, tmpStart, tmpStop, tmpNum = 0
     cdef char tmpEv
-    cdef char* regexcigar = "[0-9]+[A-Z]"
+    cdef char* regexcigar = "[0-9]+[MIDNSHP=XB]"
     cdef regex_result matches
     cdef int numI = 0, numD = 0
     cdef char zero = "0", nine="9"
@@ -55,7 +55,8 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
             charNumStart = charNum
             if tmpEv == 'I':
                 numI += tmpNum
-            elif tmpEv == 'D':
+            elif tmpEv == 'D' or tmpEv == 'N':
+                # treat intron/N as deletions
                 numD += tmpNum
             tempEventTypes[matching_pos] = tmpEv
             matching_pos += 1
@@ -126,7 +127,7 @@ cdef void extract_algn_seq(
         nevt = cigar.eventLengths[ind]
         evt = cigar.eventTypes[ind]
 
-        if evt == 'M':
+        if evt == 'M' or evt == 'X' or evt == '=':
             if (refP < min_pos):
                 adjust = (refP + nevt) - min_pos
                 if adjust <= 0:
@@ -175,7 +176,7 @@ cdef void extract_algn_seq(
                 else:
                     refP += nevt - adjust
                     nevt = adjust
-            add_gaps(sf, '-', currInd, nevt)
+            add_gaps(sf, '.', currInd, nevt)
             add_gaps(qf, '!', currInd, nevt)
             currInd += nevt
             refP += nevt

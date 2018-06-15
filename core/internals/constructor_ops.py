@@ -5,9 +5,26 @@ import pandas as pd
 import xarray as xr
 import warnings
 from collections import defaultdict
-from ..utils.alphabets import dna_alphabet, aa_alphabet, all_dna, all_aa
-from .sam_to_arr import df_to_algn_arr
+from seqtables.core.utils.alphabets import dna_alphabet, aa_alphabet, all_dna, all_aa
+from seqtables.core.internals.sam_to_arr import df_to_algn_arr
 import copy
+
+
+def trim_str(seq, pos, minP, maxP, null_let):    
+    s1 = max(0, minP - pos)
+    frontLetters = null_let * max(0, pos - minP)
+    
+    seq = frontLetters + seq[s1:]
+    pos = minP
+
+    endLetters = null_let * max(0, (maxP - (pos + len(seq) - 1)))
+
+    seq += endLetters
+
+    s2 = min(maxP - minP + 1, len(seq))
+
+    return seq[:s2]    
+    
 
 
 def strseries_to_bytearray(series, fillvalue='N', use_encoded_value=True):
@@ -64,7 +81,7 @@ def guess_seqtype(seq_data):
 
 def list_to_arr(values):
     """
-    Stupid convenience function to make sure sequences are returned as np array
+        Convenience function to make sure sequences are returned as np array
     """
     if hasattr(values, 'values'):
         # its probably a dataframe/series
@@ -76,7 +93,7 @@ def list_to_arr(values):
 
 def _seq_df_to_datarray(
     df, seq_type, index,
-    map_cols={'ref': 'rname', 'seqs': 'seq', 'quals': 'qual', 'cigar': 'cigar', 'pos': 'pos'},
+    map_cols = {},
     ref_pos_names={},
     ignore_ref_col=False,
     ref_name='',
@@ -86,7 +103,40 @@ def _seq_df_to_datarray(
 ):
     """
 
+    Converts a dataframe into seqtables format. It is assumed that the dataframe has columns which follows sam file specifications and defines the:
+        1. The sequence
+        2. The reference name
+        3. Quality score
+        4. Cigar string
+        5. Start position
+    
+    Args:
+        df (dataframe): dataframe converted from a sam file
+        map_cols (dict): dict defining how to map column names to the expected fields
+        ref_pos_names (dict): if defined, defines which references we want to define
+        ignore_ref_col (bool): If true, then will not use the reference column to define sequences
+        ref_name (string): Define the sequences with a reference
+        min_pos (default = -1): If > -1 then defines the minimum position allowed for alignment, all other aligned positions before min_pos will be trimmed
+
+            .. note::
+
+                For example, let an alignment start at position 1 as follows:
+                    AACGA 1
+                
+                If min_pos is 3 then the following sequence is returned
+                    CGA 
+        
+        max_pos (default = -2): If > 0 then defines the maximum position allowed for alignment
+        ref_to_pos_dict (dict): Allows user to custom name the 'position' dimension. If empty, then dimension is just 'position'
+    
+    Returns: 
+        xarray
+        attributes for xarray
+
     """
+    expected_map_cols={'ref': 'rname', 'seqs': 'seq', 'quals': 'qual', 'cigar': 'cigar', 'pos': 'pos'}
+    expected_map_cols.update(map_cols)
+    map_cols = copy.deepcopy(expected_map_cols)
     ref_pos_names = defaultdict(list, ref_pos_names)
 
     assert 'seqs' in map_cols, 'Error you must provide the column name for sequences'
@@ -101,15 +151,20 @@ def _seq_df_to_datarray(
         warnings.warn('Position column not found, automatically assuming sequences are aligned at position 1')
         df[map_cols['pos']] = 1
 
-    assert 'seqs' in map_cols and map_cols['seqs'] in df.columns, 'Error cannot find the column corresponding to sequences: ' + map_cols['seqs'] + ',' + ':'.join(df.columns)
+    assert 'seqs' in map_cols and map_cols['seqs'] in df.columns, 'Error cannot find the column corresponding to sequences: ' + map_cols['seqs'] + '. Columms in df: ' + ':'.join(df.columns)
     
-    if has_cigar is False:
+    if has_cigar is False:                
+        if min_pos < 0:
+            min_pos = df[map_cols['pos']].min()        
+        if max_pos < 0:
+            max_pos =  df[[map_cols['seqs'], map_cols['pos']]].apply(lambda x: x[1] - 1 + len(x[0]), axis=1).max()
+        print(min_pos, max_pos)
         # no need to do any alignment, juse use seq to dtarr func
         return _seqs_to_datarray(
-            df[map_cols['seqs']].values,
-            df[map_cols['quals']].values if has_quality is True else None,
-            pos=df[map_cols['pos']].values if 'pos' in map_cols else 1,
-            index=list(index)
+            df[[map_cols['seqs'], map_cols['pos']]].apply(lambda x: trim_str(x[0], x[1], min_pos, max_pos, '$'), axis=1).values,
+            df[[map_cols['quals'], map_cols['pos']]].apply(lambda x: trim_str(x[0], x[1], min_pos, max_pos, '!'), axis=1).values if has_quality is True else None,            
+            pos=min_pos,            
+            index=pd.Index(index)
         )
 
     if has_quality is False:
@@ -345,17 +400,20 @@ def _seqs_to_datarray(
     position_dim = prefix + 'position'  # if ref_to_pos_dim is None else ref_to_pos_dim
 
     # create dimensions
-    if isinstance(pos, int):
-        pos_arr = np.arange(pos, pos + seq_arr.shape[1])
-    elif isinstance(pos, list) or isinstance(pos, np.array):
-        pos_arr = list(copy.deepcopy(pos))
-        for i, p in enumerate(range(len(pos), seq_arr.shape[1])):
-            # add extra values for pos
-            warnings.warn('Warning adding additional positions for reference: ' + ref_name)
-            pos_arr.append(pos_arr[-1] + i + 1)
-        pos_arr = np.array(pos_arr)
-    else:
-        raise Exception('Error invalid type for position')
+    pos = int(pos)
+    
+    pos_arr = np.arange(pos, pos + seq_arr.shape[1])
+    # if isinstance(pos, int):
+        
+    # elif isinstance(pos, list) or isinstance(pos, np.ndarray):
+    #     pos_arr = list(copy.deepcopy(pos))
+    #     for i, p in enumerate(range(len(pos), seq_arr.shape[1])):
+    #         # add extra values for pos
+    #         warnings.warn('Warning adding additional positions for reference: ' + ref_name)
+    #         pos_arr.append(pos_arr[-1] + i + 1)
+    #     pos_arr = np.array(pos_arr)
+    # else:
+    #     raise Exception('Error invalid type for position')
 
     if has_quality:
         # create a dataarray for aligned sequences

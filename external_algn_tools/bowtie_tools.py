@@ -5,7 +5,7 @@ from subprocess import PIPE, Popen
 from Bio import SeqIO
 from datetime import datetime
 import re
-from .config import current_dir
+from seqtables.external_algn_tools.config import current_dir
 
 if os.name == 'posix':
 	# im on a linux machine

@@ -1,5 +1,5 @@
 import numpy as np
-from .seq_table_util import degen_to_base
+from seqtables.core.utils.seq_table_util import degen_to_base
 
 """
 Methods for generating a set of fake sequences

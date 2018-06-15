@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from ..core.utils.insilica_sequences import generate_sequence, generate_library, add_quality_scores
+from seqtables.core.utils.insilica_sequences import generate_sequence, generate_library, add_quality_scores
 
 
 def create_scratch_data(num_seqs, seq_len, ss_pos=[], error_prone_rate=0.01):

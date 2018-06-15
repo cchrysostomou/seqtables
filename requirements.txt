@@ -8,3 +8,5 @@ matplotlib
 plotly
 regex
 orderedset
+scipy
+pysam
