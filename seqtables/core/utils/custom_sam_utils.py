@@ -3,7 +3,15 @@ import re
 import numpy as np
 from collections import OrderedDict, defaultdict
 import time
-import regex
+import warnings
+try:
+    import regex
+    regex_found = True
+except ImportError as e:
+    # warnings.warn('Warning, module regex not found . please install for expected functionality')
+    import re as regex
+    regex_found = False
+
 from seqtables.core.utils.alphabets import extended_cigar_alphabet
 
 def breakdown_bits(flag, asstring=True):
@@ -21,6 +29,7 @@ def breakdown_bits(flag, asstring=True):
     1024 0x400 PCR or optical duplicate
     2048 0x800 supplementary alignment
     """
+    
     if flag == 0:
         return [] if asstring is True else ''
     flags = [n for n in range(int(np.log2(flag)) + 1) if flag & (1 << n)]
@@ -64,6 +73,7 @@ def cigar_breakdown(cigarstring):
         ordered_mutations (list of tuples): an ordered list of all events (type, # of bases)
         mutation_summary (dict): a dict showing the number of times events were detected (i.e. total matches, total deletions)
     """
+    assert regex_found is True, 'Please install regex module before attempting to read samfiles'
     re_search_string = r'((\d+)([{0}]))+'.format(extended_cigar_alphabet)
     result = regex.match(re_search_string, cigarstring)
     if result:
@@ -315,6 +325,17 @@ def read_sam(file, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', '
                 # print(optional_columns)
                 # print(df.iloc[0])
                 # print(df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True)/)
+                # print(df[optional_columns].head())
+                # print(optional_columns)
+                keys = []
+                # print(df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True))
+                for x in df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True):
+                    keys.extend(x.keys())
+                # print(sorted(list(set(keys))))
+                # print('x')
+                # tmp = df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True)[:10]
+                # print(tmp[0])
+                new_columns = pd.DataFrame.from_records(df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True)[:10])
                 new_columns = pd.DataFrame.from_records(df[optional_columns].fillna("").apply(extract_optional_features, axis=1, raw=True))
                 opt_fields_keep = [o for o in opt_fields_keep if o in new_columns.columns]
 

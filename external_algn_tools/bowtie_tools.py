@@ -33,7 +33,7 @@ def build_reference(input_fasta, ref_name, ref_path=None):
 			os.makedirs(ref_path)
 		ref_name = os.path.join(ref_path, os.path.basename(ref_name))
 
-	execute_call = [os.path.join(bowtie_path, "bowtie2-build"), "'{0}'".format(input_fasta), "'{0}'"..format(ref_name), ' --quiet']
+	execute_call = [os.path.join(bowtie_path, "bowtie2-build"), "'{0}'".format(input_fasta), "'{0}'".format(ref_name), ' --quiet']
 
 	proc = Popen(execute_call, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	message, err = proc.communicate()

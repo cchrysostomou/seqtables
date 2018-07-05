@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from collections import defaultdict
 import warnings
 try:
@@ -5,10 +7,16 @@ try:
     plotly_installed = True
 except:
     plotly_installed = False
-    warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
+    # warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
 import math
 import numpy as np
-from scipy.stats import binom
+
+try:
+    from scipy.stats import binom
+    scipy_binom_installed = True
+except ImportError as e:
+    scipy_binom_installed = False
+    # warnings.warn("Warning: cannot seem to import binom from scipy. This impacts ability to use plogo functionality. If you would like to generate plogo please install scipy")
 
 import pandas as pd
 
@@ -390,6 +398,9 @@ def get_plogo(fg_counts, seqtype, bkgrnd_freq=None, use_cdf=True, use_ln=False, 
                 above => binom.sf(k-1, N, p) => where sf is same as 1-cdf; and we are doing k-1 such that we include k in the sf function rather than exclude it as expected from a 1-cdf
                 below => binom.cdf(k, N, p)
         """
+
+        assert scipy_binom_installed is True, 'Please install scipy to run plogo'
+        
         if use_cdf is True:
             # faster than looping for large k/N
             above_k = binom.logsf(k - 1, N, freq)

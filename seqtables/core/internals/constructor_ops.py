@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-
+import numbers
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -25,7 +25,6 @@ def trim_str(seq, pos, minP, maxP, null_let):
 
     return seq[:s2]    
     
-
 
 def strseries_to_bytearray(series, fillvalue='N', use_encoded_value=True):
     encode_type = 'S' if use_encoded_value else 'U'
@@ -146,6 +145,10 @@ def _seq_df_to_datarray(
     has_cigar = 'cigar' in map_cols and map_cols['cigar'] in df.columns
 
     assert 'pos' in map_cols
+    
+    # print(df[map_cols['ref']].value_counts())
+    # print('yadda')
+    # print(df.head())
 
     if map_cols['pos'] not in df.columns:
         warnings.warn('Position column not found, automatically assuming sequences are aligned at position 1')
@@ -169,15 +172,15 @@ def _seq_df_to_datarray(
 
     if has_quality is False:
         df[map_cols['quals']] = ''
-
-    return _algn_seq_to_datarray(
+        
+    return _algn_seq_to_datarray(        
         ref_name,
         seq_type,
         phred_adjust=33,
         data=[
             df[map_cols['seqs']].values,
             df[map_cols['quals']].values,  # if has_quality is True else None, # np.array([]),
-            df[map_cols['pos']].astype(np.int).values,
+            df[map_cols['pos']].astype(np.int64).values,
             df[map_cols['cigar']].values,
             np.array(list(index))
         ],
@@ -399,10 +402,21 @@ def _seqs_to_datarray(
 
     position_dim = prefix + 'position'  # if ref_to_pos_dim is None else ref_to_pos_dim
 
-    # create dimensions
-    pos = int(pos)
+    # create dimensions    
+    if isinstance(pos, numbers.Number):
+        pos = int(pos)
+        pos_arr = np.arange(pos, pos + seq_arr.shape[1])
+    else:
+        pos_arr = list(copy.deepcopy(pos))
+        for i, p in enumerate(range(len(pos), seq_arr.shape[1])):
+            # add extra values for pos
+            warnings.warn('Warning adding additional positions for reference: ' + ref_name)
+            pos_arr.append(pos_arr[-1] + i + 1)
+        pos_arr = np.array(pos_arr)
     
-    pos_arr = np.arange(pos, pos + seq_arr.shape[1])
+    # print(pos)
+    # pos = int(pos)
+    
     # if isinstance(pos, int):
         
     # elif isinstance(pos, list) or isinstance(pos, np.ndarray):

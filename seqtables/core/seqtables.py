@@ -1,4 +1,7 @@
 from __future__ import absolute_import
+# py2/py3 compatibility
+from builtins import (bytes, str, open, super, range,
+                      zip, round, input, int, pow, object)
 # from ..internals import xarray_extensions
 import xarray as xr
 from seqtables.core.internals import _seq_df_to_datarray, _seqs_to_datarray
@@ -10,7 +13,7 @@ import warnings
 import copy
 import numpy as np
 import pandas as pd
-import scipy
+# import scipy
 from six import string_types
 from collections import defaultdict
 import itertools
@@ -62,7 +65,7 @@ def df_to_dataarray(
         attributes for xarray
 
     """
-
+    # print(df.columns)
     ignore_ref_col = True if ref_name else False
     arrs, attrs = _seq_df_to_datarray(
         df, seq_type, index, ignore_ref_col=ignore_ref_col, ref_name=ref_name, ref_to_pos_dict=ref_to_pos_dict,
@@ -149,8 +152,8 @@ class SeqTable(xr.DataArray):
         >>> sq = read_fastq('fastqfile.fq')
     """
 
-    @classmethod
-    def from_df(cls, *args, **kwargs):
+    @staticmethod
+    def from_df(*args, **kwargs):
         """
 
             Converts a dataframe into seqtables format. It is assumed that the dataframe has columns which follows sam file specifications and defines the:
@@ -188,23 +191,25 @@ class SeqTable(xr.DataArray):
         # new_st.update_attributes()
         return new_st
 
-    @classmethod
-    def from_list(cls, *args, **kwargs):
+    @staticmethod
+    def from_list(*args, **kwargs):
         new_st = SeqTable(seqs_to_datarray(*args, **kwargs))
         # new_st.update_attributes()
         return new_st
 
-    @classmethod
-    def from_sam(cls, sam_file_location, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', 'seq', 'qual'], opt_fields_keep=['XN', 'XM', 'MD'], nrows=None, chunks=None, indexing_dict = None, ignore_quotes=True, comment_out_letter=False, min_pos=-1, max_pos=-2, seq_type='NT'):
+    @staticmethod
+    def from_sam(sam_file_location, std_fields_keep=['header', 'flag', 'rname', 'pos', 'cigar', 'seq', 'qual'], opt_fields_keep=['XN', 'XM', 'MD'], nrows=None, chunks=None, indexing_dict = None, ignore_quotes=True, comment_out_letter=False, min_pos=-1, max_pos=-2, seq_type='NT'):
         """
             Returns an iterator that reads through a sam file using pysam and then returns results in seqtable format
         """
         samfile_reader = read_sam(sam_file_location, std_fields_keep, opt_fields_keep, nrows,chunks,indexing_dict,ignore_quotes,comment_out_letter)
+        
         for sam_df in samfile_reader:
-            yield SeqTable.from_df(sam_df[['seq', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos)
+            sam_df = sam_df[sam_df['rname'] != '*']
+            yield SeqTable.from_df(sam_df[['seq', 'rname', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, max_pos=max_pos)
 
-    @classmethod
-    def from_pysam(cls, alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', min_pos=-1, max_pos=-2):
+    @staticmethod
+    def from_pysam(alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', min_pos=-1, max_pos=-2):
         """
             Returns an iterator that reads through a sam file using pysam and then returns results in seqtable format
 
@@ -220,33 +225,33 @@ class SeqTable(xr.DataArray):
         samfile_reader = alignment_file.fetch(*fetch_args, **fetch_kwargs)
         if chunks is None:
             chunks = float('Inf')
-        
-        while True:
-            counter = 0
-            data = []
-
-            for read in samfile_reader:        
-                data.append((read.query_name, read.seq, read.qual, read.pos, read.cigarstring))
-                counter += 1
-                if counter == chunks:                    
-                    df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
-                    yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos) 
-                    counter = 0
-                    data = []
-        
+                
+        counter = 0
+        data = []
+        for read in samfile_reader:        
+            data.append((read.query_name, read.seq, read.qual, read.pos, read.cigarstring))
+            counter += 1
+            if counter == chunks:                    
+                df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+                yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+                counter = 0
+                data = []
+            
         if len(data) > 0:
             df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
-            yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, mx_pos=max_pos) 
+            yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
             counter = 0
             data = []
 
     def __init__(self, seq_list, *args, **kwargs):
         if isinstance(seq_list, list) or isinstance(seq_list, np.ndarray) or isinstance(seq_list, pd.Series):
-            xarr = seqs_to_datarray(seq_list, *args, **kwargs)
-            super(SeqTable, self).__init__(xarr)  # data_vars=arrs, attrs=attrs)
+            xarr = seqs_to_datarray(seq_list, *args, **kwargs)                        
+            # super(SeqTable, self).__init__(xarr)  # data_vars=arrs, attrs=attrs)
+            super().__init__(xarr)  # data_vars=arrs, attrs=attrs)
             # self.update_attributes()
         else:
-            super(SeqTable, self).__init__(seq_list, *args, **kwargs)
+            # super(SeqTable, self).__init__(seq_list, *args, **kwargs)
+            super().__init__(seq_list, *args, **kwargs)
 
     # def update_attributes(self):
     #     self.phred_adjust = self.attrs['seqtable'].get('phred_adjust', 33)
@@ -586,6 +591,7 @@ class SeqTable(xr.DataArray):
         # if ref_seq_positions is None:
         #     # assume that the position of the reference sequences are already lined up to the reference sequence
         #     ref_seq_positions = self.position.values[:max_seq_len]
+        # use the maximum sequence length observed in list of sequences in seqtable to rmeove other reference positions that are irrelevent (past the region of interest)
         ref_seq_positions = list(ref_seq_positions)[:max_seq_len]
 
         # print(reference_seqs)
@@ -1278,7 +1284,7 @@ class SeqTable(xr.DataArray):
             else:
                 insertion_events = pd.Series(ins_df.loc[(slice(None), slice(None), -1), :].groupby(level=1).apply(len), name='position')
         else:
-            insertion_events = [np.nan]
+            insertion_events = pd.Series([np.nan])
 
         if not(positions is None):
             return insertion_events.loc[insertion_events.index.intersection(positions)]
@@ -1350,30 +1356,30 @@ class SeqTable(xr.DataArray):
         else:
             return insertion_events
 
-    def get_consensus_depr(self, positions=None, modecutoff=0.5):
-        """
-            Returns the sequence consensus of the bases at the defined positions
+    # def get_consensus_depr(self, positions=None, modecutoff=0.5):
+    #     """
+    #         Returns the sequence consensus of the bases at the defined positions
 
-            Args:
-                positions: Slice which positions in the table should be conidered
-                modecutoff: Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)
+    #         Args:
+    #             positions: Slice which positions in the table should be conidered
+    #             modecutoff: Only report the consensus base of letters which appear more than the provided modecutoff (in other words, the mode must be greater than this frequency)
 
-            .. note:: deprecation
+    #         .. note:: deprecation
 
-                This function appears to be slightly slower than the newer get_consensus function
-        """
-        compare = self.loc[:, positions, 'seq'].values.view(np.uint8) if positions else self.loc[:, :, 'seq'].values.view(np.uint8)
-        cutoff = float(compare.shape[0]) * modecutoff
-        chars = compare.shape[1]
-        # dist = np.int8(compare.apply(lambda x: x.mode()).values[0])
-        # dist = np.int8(compare.reduce(func=lambda x, axis: scipy.stats.mode(x), dim='position'))   # apply(lambda x: x.mode()).values[0])
-        dist = np.apply_along_axis(arr=compare, func1d=lambda x: scipy.stats.mode(x), axis=0)
-        # dist[0][0] # => mode
-        # dist[1][1] # => counts for mode
-        dist[0][0][dist[1][0] <= cutoff] = ord('N')
+    #             This function appears to be slightly slower than the newer get_consensus function
+    #     """
+    #     compare = self.loc[:, positions, 'seq'].values.view(np.uint8) if positions else self.loc[:, :, 'seq'].values.view(np.uint8)
+    #     cutoff = float(compare.shape[0]) * modecutoff
+    #     chars = compare.shape[1]
+    #     # dist = np.int8(compare.apply(lambda x: x.mode()).values[0])
+    #     # dist = np.int8(compare.reduce(func=lambda x, axis: scipy.stats.mode(x), dim='position'))   # apply(lambda x: x.mode()).values[0])
+    #     dist = np.apply_along_axis(arr=compare, func1d=lambda x: scipy.stats.mode(x), axis=0)
+    #     # dist[0][0] # => mode
+    #     # dist[1][1] # => counts for mode
+    #     dist[0][0][dist[1][0] <= cutoff] = ord('N')
 
-        seq = (np.uint8(dist[0][0])).view('S' + str(chars))[0]
-        return seq
+    #     seq = (np.uint8(dist[0][0])).view('S' + str(chars))[0]
+    #     return seq
 
     def get_consensus(self, positions=None, modecutoff=0.5, include_insertions=True, return_column_positions=False, exclude_insertions_with_gap_cons=True):
         """

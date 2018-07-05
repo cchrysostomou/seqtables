@@ -9,7 +9,7 @@ try:
     plotly_installed = True
 except:
     plotly_installed = False
-    warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
+    # warnings.warn("PLOTLY not installed so interactive plots are not available. This may result in unexpected funtionality")
 
 global_3d_mapper = np.repeat(0, 256 * 4).reshape(256, -1)
 global_3d_mapper[ord('T'), :] = np.array([0, 0, 0, 1])
@@ -326,7 +326,7 @@ def get_quality_dist(
 
         color = 'red' if median < 20 else 'blue' if median < 30 else 'green'
 
-        if plotly_installed:
+        if plotly_installed is True:
             # create a box plot using the fake sample_data, again this is better for memory resources since plotly stores all datapoints in javascript
             plotdata = go.Box(
                 y=sample_data,
@@ -345,6 +345,7 @@ def get_quality_dist(
                 )
             )
         else:
+            warnings.warn('PLOTLY not installed. No graph object data was returned')
             plotdata = None
 
         graphs.append(plotdata)

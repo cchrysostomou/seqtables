@@ -1,6 +1,6 @@
 # cimport cpython
 import numpy as np
-import pandas as pd
+# import pandas as pd
 cimport numpy as np
 cimport cython
 from cython.view cimport array as cvarray
@@ -49,6 +49,7 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     while charNum < strLen:
         tmpEv = cigarstring[charNum]
         if((tmpEv < zero) | (tmpEv > nine)):
+            # do nothing for : padded (P), hardclip (H), AND B
             # its not a number, but a letter that defines the cigar string (i.e. M in 235M)
             tmpNum = atoi(cigarstring[charNumStart + 1:charNum])  # determine number of events using substring preceding letter
             tempEventCounts[matching_pos] = tmpNum
