@@ -3,6 +3,7 @@
 
 # ignore sphinxdocs #
 - (^|/)[Ss]phinx[Dd]ocs/ linguist-vendored=false
+SphinxDocs/* linguist-vendored=false
 
 # ignore illustrations, examples, etc #
 - (^|/)illustrations/ linguist-vendored=false
