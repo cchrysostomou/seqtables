@@ -17,7 +17,7 @@ DTYPE_str = np.str
 ctypedef np.str DTYPE_str_t
 
 cdef struct regex_result:
-    int numHits, totalIns, totalDel
+    int numHits, totalIns, totalDel, totalClip
     int *eventLengths
     char *eventTypes
 
@@ -41,7 +41,7 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     cdef char tmpEv
     cdef char* regexcigar = "[0-9]+[MIDNSHP=XB]"
     cdef regex_result matches
-    cdef int numI = 0, numD = 0
+    cdef int numI = 0, numD = 0, numC = 0
     cdef char zero = "0", nine="9"
 
     cdef int charNum = 0, charNumStart=-1
@@ -59,6 +59,8 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
             elif tmpEv == 'D' or tmpEv == 'N':
                 # treat intron/N as deletions
                 numD += tmpNum
+            elif tmpEv == 'S':
+                numC += tmpNum
             tempEventTypes[matching_pos] = tmpEv
             matching_pos += 1
         charNum += 1
@@ -68,6 +70,7 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
     matches.eventTypes = tempEventTypes
     matches.totalIns = numI
     matches.totalDel = numD
+    matches.totalClip = numC
 
     return matches
 
@@ -251,13 +254,14 @@ cpdef df_to_algn_arr(
 
     for ind in range(nSeq):
         match_vec[ind] = cigar_breakdown(cigars[ind].encode(), len(cigars[ind]))
-        tmpPosStore = pos[ind] + len(seqs[ind]) + match_vec[ind].totalDel - match_vec[ind].totalIns - 1
+        tmpPosStore = pos[ind] + len(seqs[ind]) + match_vec[ind].totalDel - match_vec[ind].totalIns - 1 - match_vec[ind].totalClip
         if (match_vec[ind].totalIns > maxTotalIns):
             maxTotalIns = match_vec[ind].totalIns
         if (tmpPosStore > maxPosStore):
            maxPosStore = tmpPosStore
         if (minPosStore > pos[ind]):
            minPosStore = pos[ind]
+        
 
     if  (min_pos == -1): # (min_pos < 0):
         # assume its not defined by user....
@@ -266,6 +270,8 @@ cpdef df_to_algn_arr(
     if  (max_pos == -2):  # (min_pos > max_pos):
         # assume its not defined by user ....
         max_pos = maxPosStore
+    
+    # print(minPosStore, maxPosStore)
 
     longestSequenceLengthFound = maxPosStore - minPosStore + 1
 
