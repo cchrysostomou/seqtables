@@ -8,8 +8,14 @@
 # `test/test_blob.rb#test_vendored` if you make any changes.
 
 # ignore external executable folder #
+- (^|/)external_algn_tools/
 
 # ignore sphinxdocs #
+- (^|/)[Ss]phinx[Dd]ocs/
+
+# ignore illustrations, examples, etc #
+- (^|/)illustrations/
+- (^|/)examples/
 
 ## Vendor Conventions ##
 
