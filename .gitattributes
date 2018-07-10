@@ -2,7 +2,7 @@
 external_algn_tools/* linguist-vendored
 
 # ignore sphinxdocs #
-[Ss]phinx[Dd]ocs/* linguist-vendored
+SphinxDocs/* linguist-vendored
 
 # ignore illustrations, examples, etc #
 illustrations/* linguist-vendored
