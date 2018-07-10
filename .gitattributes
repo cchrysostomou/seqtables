@@ -1,10 +1,10 @@
 # ignore external executable folder #
-- (^|/)external_algn_tools/ linguist-vendored=false
+- (^|/)external_algn_tools/ linguist-vendored
 
 # ignore sphinxdocs #
-- (^|/)[Ss]phinx[Dd]ocs/ linguist-vendored=false
+- (^|/)[Ss]phinx[Dd]ocs/* linguist-vendored
 SphinxDocs/* linguist-vendored
 
 # ignore illustrations, examples, etc #
-- (^|/)illustrations/ linguist-vendored=false
-- (^|/)examples/ linguist-vendored=false
+- (^|/)illustrations/ linguist-vendored
+- (^|/)examples/ linguist-vendored
