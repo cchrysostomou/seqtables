@@ -3,6 +3,7 @@ external_algn_tools/* linguist-vendored
 
 # ignore sphinxdocs #
 SphinxDocs/* linguist-vendored
+SphinxDocs/build/* linguist-vendored
 
 # ignore illustrations, examples, etc #
 illustrations/* linguist-vendored
