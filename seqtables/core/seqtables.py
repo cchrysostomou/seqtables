@@ -65,6 +65,17 @@ def df_to_dataarray(
         attributes for xarray
 
     """
+    # convert '\*' fields into np.nan
+    if map_cols['ref'] in df.columns:
+        df[map_cols['ref']].replace(r'\*', np.nan, inplace=True)
+    if map_cols['cigar'] in df.columns:
+        df[map_cols['cigar']].replace(r'\*', np.nan, inplace=True)
+    has_null_field = df.isnull().sum(axis=1)
+    remove_rows = (has_null_field > 0).sum()
+    if remove_rows > 0:
+        warnings.warn('Warning, dropping {0} rows because they contained null fields either in their reference or cigar'.format(remove_rows))
+        df = df[has_null_field == 0]
+    
     # print(df.columns)
     ignore_ref_col = True if ref_name else False
     arrs, attrs = _seq_df_to_datarray(
@@ -186,7 +197,7 @@ class SeqTable(xr.DataArray):
                 xarray
                 attributes for xarray
 
-        """
+        """    
         new_st = SeqTable(df_to_dataarray(*args, **kwargs))
         # new_st.update_attributes()
         return new_st
@@ -205,7 +216,7 @@ class SeqTable(xr.DataArray):
         samfile_reader = read_sam(sam_file_location, std_fields_keep, opt_fields_keep, nrows,chunks,indexing_dict,ignore_quotes,comment_out_letter)
         
         for sam_df in samfile_reader:
-            sam_df = sam_df[sam_df['rname'] != '*']
+            sam_df = sam_df[sam_df['rname'] != '*']            
             yield SeqTable.from_df(sam_df[['seq', 'rname', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, max_pos=max_pos)
 
     @staticmethod
@@ -229,16 +240,20 @@ class SeqTable(xr.DataArray):
         counter = 0
         data = []
         for read in samfile_reader:        
-            data.append((read.query_name, read.seq, read.qual, read.pos, read.cigarstring))
+            data.append((read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring))
             counter += 1
             if counter == chunks:                    
-                df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+                df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')                                                
+                # add 1 to the position because pysam treats positions from 0 index (converts position from bowtie to 0 base index)
+                df['pos'] += 1
                 yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
                 counter = 0
                 data = []
             
         if len(data) > 0:
-            df = pd.DataFrame(data, columns=['header', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+            df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+            # add 1 to the position because pysam treats positions from 0 index
+            df['pos'] += 1
             yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
             counter = 0
             data = []
@@ -425,13 +440,23 @@ class SeqTable(xr.DataArray):
         else:
             ins_table_seq = filtered_insertion_table['seq'].unstack(level=(1, 2), fill_value=ord(ins_char))
 
-            seqs_with_ins = pd.concat([
-                pd.DataFrame(
-                    self.loc[:, positions, 'seq'].values.view(np.uint8),
-                    columns=positions, index=self.read.values
-                ),
-                ins_table_seq
-            ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
+            # seqs_with_ins = pd.concat([
+            #     pd.DataFrame(
+            #         self.loc[:, positions, 'seq'].values.view(np.uint8),
+            #         columns=positions, index=self.read.values
+            #     ),
+            #     ins_table_seq
+            # ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
+            
+            seqs_with_ins = pd.DataFrame(
+                self.loc[:, positions, 'seq'].values.view(np.uint8),
+                columns=pd.MultiIndex.from_product([positions, [0]]), index=self.read.values
+            ).merge(
+                ins_table_seq, 
+                left_index=True, 
+                right_index=True,
+                how='left'
+            ).dropna(how='all', axis=1).fillna(ord(ins_char)).astype(np.uint8)
 
         # realign column sin table so that insertion bases are in the proper position with respect to referene positions
         cols = list(seqs_with_ins.columns)
@@ -453,13 +478,22 @@ class SeqTable(xr.DataArray):
                 )
             else:
                 ins_table_qual = filtered_insertion_table['quality'].unstack(level=(1, 2), fill_value=ord(self.null_qual) - self.phred_adjust)
-                quals_with_ins = pd.concat([
-                    pd.DataFrame(
-                        self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust,
-                        columns=positions, index=self.read.values
-                    ),
-                    ins_table_qual
-                ], axis=1).fillna(ord(self.null_qual) - self.phred_adjust).astype(np.uint8)
+                # quals_with_ins = pd.concat([
+                #     pd.DataFrame(
+                #         self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust,
+                #         columns=positions, index=self.read.values
+                #     ),
+                #     ins_table_qual
+                # ], axis=1).fillna(ord(self.null_qual) - self.phred_adjust).astype(np.uint8)
+                quals_with_ins = pd.DataFrame(
+                    self.loc[:, positions, 'quality'].values.view(np.uint8) - self.phred_adjust,
+                    columns=pd.MultiIndex.from_product([positions, [0]]), index=self.read.values
+                ).merge(
+                    ins_table_qual,
+                    left_index=True,
+                    right_index=True,
+                    how='left'
+                ).dropna(how='all', axis=1).fillna(ord(self.null_qual) - self.phred_adjust).astype(np.uint8)
 
             quals_with_ins = quals_with_ins.iloc[:, sorted_column_indicies]
             quals_with_ins.columns = renamed_cols
@@ -492,23 +526,46 @@ class SeqTable(xr.DataArray):
                     }
                 )
 
-    def slice_sequences(self, positions=None, name='seqs', include_insertions=False, return_quality=False, empty_chars=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True):
+    def slice_sequences(self, positions=None, name='seqs', name_qual='quals', include_insertions=False, return_quality=False, empty_chars=None, empty_quals=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True):
+        """
+        positions (array/list): positions that we want to slice from table
+        name (string): Name of the sequence column that is returned
+        name_qual (string): Name of the quality column that is returned
+        include_insertions (bool): If true, then positions containing insertions will also be reported
+
+            .. note:: Returning column positions
+
+                If a read does NOT have an insertion at that position it will be reported using the empty_chars/null value. 
+                It is reccommended to also return_column_positions when returning insertions. 
+                This will help to understand which positions in the sliced sequenes are insertions found in a subset of the data and which are non insertions in the reference.
+
+                i.e.  READ1 = AACaTGT
+                      READ2 = AACTGT
+                      READ3 = AACTGA
+
+                slicing sequences will appear as (if empty_chars=None or empty_chars='N')
+
+                        AACATGT
+                        AACNTGT
+                        AACNTGA
+
+        """
         if empty_chars is None:
             empty_chars = self.fill_na_val
-
+                
         if positions is None:
             positions = self.position.values
 
         positions = OrderedSet(list(positions))
-
+        
         # confirm that all positions are present in the column
         missing_pos = positions - OrderedSet(self.position.values)
 
-        if len(missing_pos) > 0:
+        if len(missing_pos) > 0:            
             new_positions = list(positions & OrderedSet(self.position.values))
-            prepend = ''.join([empty_chars for p in positions if p < self.position.values.min()])
-            append = ''.join([empty_chars for p in positions if p > self.position.values.max()])
-            positions = new_positions
+            prepend = empty_chars * (np.array(positions) < self.position.values.min()).sum() # ''.join([empty_chars for p in positions if p < self.position.values.min()])
+            append =  empty_chars * (np.array(positions) > self.position.values.max()).sum() # ''.join([empty_chars for p in positions if p > self.position.values.max()])
+            positions = new_positions            
             warnings.warn("The sequences do not cover all positions requested. {0}'s will be appended and prepended to sequences as necessary".format(empty_chars))
         else:
             prepend = ''
@@ -529,9 +586,9 @@ class SeqTable(xr.DataArray):
             # nothing to return
             if return_quality:
                 qual_empty = self.null_qual * (len(prepend) + len(append))
-                return pd.DataFrame({'seqs': prepend + append, 'quals': qual_empty}, columns=['seqs', 'quals'], index=tmp_data.read.values)
+                return pd.DataFrame({name: prepend + append, name_qual: qual_empty}, columns=[name, name_qual], index=tmp_data.read.values)
             else:
-                return pd.DataFrame(prepend + append, columns=['seqs'], index=tmp_data.read.values)
+                return pd.DataFrame(prepend + append, columns=[name], index=tmp_data.read.values)
 
         # slice data into sequences
         if 'type' in tmp_data.dims:
@@ -544,22 +601,38 @@ class SeqTable(xr.DataArray):
             substring = pd.DataFrame({
                 name: tmp_data.values.copy().view('S{0}'.format(num_chars)).ravel()
             }, index=tmp_data.read.values)
-
-        if prepend or append:
-            substring['seqs'] = prepend + substring['seqs'] + append  # substring['seqs'].apply(lambda x: prepend + x + append)
+            
+        # if prepend or append:
+            # substring['seqs'] = prepend + substring['seqs'] + append  # substring['seqs'].apply(lambda x: prepend + x + append)
 
         if 'type' in tmp_data.dims and return_quality is True:
             subquality = tmp_data.sel(type='quality').values.copy().view('S{0}'.format(num_chars)).ravel()
-            substring['quals'] = subquality
-            if prepend or append:
-                prepend = self.null_qual * len(prepend)
-                append = self.null_qual * len(append)
-                substring['quals'] = prepend + substring['quals'] + append  # .apply(lambda x: prepend + x + append)
+            substring[name_qual] = subquality            
+            # if prepend or append:
+            #     prepend = self.null_qual.encode() * len(prepend)
+            #     append = self.null_qual.encode() * len(append)     
+            #     print((prepend + substring['seqs'] + append))
+            #     substring['quals2'] = prepend + substring['seqs'] + append  # .apply(lambda x: prepend + x + append)
+            #     print(substring.head())
         # print(substring)
+
+        substring = substring.applymap(lambda x: x.decode())
+
+        if prepend or append:
+            # add null values to front and end of sliced sequence
+            substring[name] = prepend + substring[name] + append        
+            # add in quality scores
+            if 'type' in tmp_data.dims and return_quality is True:    
+                if empty_quals is None:
+                    empty_quals = self.null_qual
+                prepend_qual = empty_quals * len(prepend)
+                append_qual = empty_quals * len(append)            
+                substring[name_qual] = prepend_qual + substring[name_qual] + append_qual
+
         if return_column_positions is True:
-            return substring.applymap(lambda x: x.decode()), tmp_data.position.values
+            return substring, tmp_data.position.values
         else:
-            return substring.applymap(lambda x: x.decode())
+            return substring  #.applymap(lambda x: x.decode())
 
     def subsample(self, numseqs, replace=False):
         """
@@ -663,7 +736,7 @@ class SeqTable(xr.DataArray):
 
                         If turned on, then the datatype returned will be of FLOAT and not BOOL. This is because we cannot represent np.nan as a bool, it will alwasy be treated as true
 
-                treat_as_true (char or list of chars): When performing distance/finding mismatches, these BASES WILL ALWAYS BE TREATED AS TRUE/A MATCH
+                treat_as_match (char or list of chars): When performing distance/finding mismatches, these BASES WILL ALWAYS BE TREATED AS TRUE/A MATCH
                 return_num_bases (bool): If true, returns a second argument defining the number of relevant bases present in each row
 
                     ..important:: Change in output results
@@ -1142,7 +1215,7 @@ class SeqTable(xr.DataArray):
 
         return filtered
 
-    def convert_low_bases_to_null(self, q, replace_with=None, inplace=False, remove_from_insertions=True):
+    def convert_low_bases_to_null(self, q, replace_with=None, inplace=False, remove_from_insertions=True, ignore_null_qual=True):
         """
             This will convert all letters whose corresponding quality is below a cutoff to the value replace_with
 
@@ -1154,7 +1227,12 @@ class SeqTable(xr.DataArray):
                     ..Note:: None
 
                         When replace with is set to None, then it will replace bases below the quality with the objects fill_na attribute
+
+                ignore_null_qual (boolean): When true then it will NOT convert any bases whose base quality is 0
         """
+
+        ignore_qual = -1 if ignore_null_qual is False else 0
+
         if 'quality' not in self.type.values:
             raise Exception("You have not passed in any quality data for these sequences")
 
@@ -1163,11 +1241,15 @@ class SeqTable(xr.DataArray):
         if replace_with is None:
             replace_with = self.fill_na_val
 
-        meself.sel(type='seq').values[meself.sel(type='quality').values.view(np.uint8) - self.phred_adjust < q] = replace_with
+        qual_as_num = meself.sel(type='quality').values.view(np.uint8) - self.phred_adjust
+
+        meself.sel(type='seq').values[
+            (qual_as_num < q) & (qual_as_num > ignore_qual)
+        ] = replace_with
 
         if remove_from_insertions and 'insertions' in meself.attrs.get('seqtable', {}):
             ins_df = meself.attrs.get('seqtable', {}).get('insertions')
-            ins_df = ins_df[ins_df['quality'].values >= q]
+            ins_df = ins_df[(ins_df['quality'].values >= q) | (ins_df['quality'].values <= ignore_qual)]
             #meself.insertions = ins_df
             meself.attrs['seqtable']['insertions'] = ins_df
 
