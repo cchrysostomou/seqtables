@@ -499,7 +499,15 @@ class SeqTable(xr.DataArray):
             quals_with_ins.columns = renamed_cols
 
             seqs_with_ins = pd.concat([seqs_with_ins, quals_with_ins], axis=1, keys=['seq', 'quality'])
-
+        
+        # if seqs_with_ins.empty:
+        #     # its an empty dataframe, so need to add columns for accessing keys later on
+        #     print('some positions', positions)
+        #     print(self.loc[:, positions])
+        #     print('seq_with_ins_before', seqs_with_ins)            
+        #     seqs_with_ins = pd.DataFrame([] dtype=np.uint8, columns=['seq', 'quality'])
+        #     print('seq_with_ins_after', seqs_with_ins)
+        # try:
         if return_as_dataframe is True:
             return seqs_with_ins
         else:
@@ -525,6 +533,11 @@ class SeqTable(xr.DataArray):
                         'position': renamed_cols,
                     }
                 )
+        # except Exception as e:
+        #     print('DEBUGGING', return_as_dataframe, include_quality)
+        #     print(seqs_with_ins)
+        #     print(str(e))
+        #     raise Exception('THE STEP IN VIEW WITH INS FAILED!!')
 
     def slice_sequences(self, positions=None, name='seqs', name_qual='quals', include_insertions=False, return_quality=False, empty_chars=None, empty_quals=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True):
         """
