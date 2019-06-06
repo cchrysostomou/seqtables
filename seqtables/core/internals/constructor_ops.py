@@ -172,7 +172,9 @@ def _seq_df_to_datarray(
 
     if has_quality is False:
         df[map_cols['quals']] = ''
-        
+    
+
+
     return _algn_seq_to_datarray(        
         ref_name,
         seq_type,
@@ -208,6 +210,10 @@ def _algn_seq_to_datarray(
     #     index = np.array(data[-1])
     # else:
     #     index = data[-1]
+    # print('yadda', data[0].shape)
+    if data[0].shape[0] == 0:
+        # print('data is removing')
+        return xr.DataArray([]), {}            
 
     # add in gaps and remove indels in cython fnc
     aligned_arrs = df_to_algn_arr(*data, edge_gap=ord(edge_gap), null_quality=ord(null_quality), min_pos=min_pos, max_pos=max_pos)  # , edgeGap='$')

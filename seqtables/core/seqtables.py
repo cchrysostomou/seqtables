@@ -217,7 +217,9 @@ class SeqTable(xr.DataArray):
         
         for sam_df in samfile_reader:
             sam_df = sam_df[sam_df['rname'] != '*']            
-            yield SeqTable.from_df(sam_df[['seq', 'rname', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, max_pos=max_pos)
+            st = SeqTable.from_df(sam_df[['seq', 'rname', 'qual', 'pos', 'cigar']], index=sam_df['header'],seq_type=seq_type, min_pos=min_pos, max_pos=max_pos)
+            if st.shape[0] > 0:
+                yield st
 
     @staticmethod
     def from_pysam(alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', min_pos=-1, max_pos=-2):
@@ -233,7 +235,11 @@ class SeqTable(xr.DataArray):
             Returns:
                 Iterator to seqtable object                
         """
-        samfile_reader = alignment_file.fetch(*fetch_args, **fetch_kwargs)
+        try:
+            samfile_reader = alignment_file.fetch(*fetch_args, **fetch_kwargs)
+        except ValueError:
+            samfile_reader = alignment_file
+
         if chunks is None:
             chunks = float('Inf')
                 
@@ -246,7 +252,10 @@ class SeqTable(xr.DataArray):
                 df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')                                                
                 # add 1 to the position because pysam treats positions from 0 index (converts position from bowtie to 0 base index)
                 df['pos'] += 1
-                yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+                # yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+                st = SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+                if st.shape[0] > 0:
+                    yield st
                 counter = 0
                 data = []
             
@@ -254,7 +263,10 @@ class SeqTable(xr.DataArray):
             df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
             # add 1 to the position because pysam treats positions from 0 index
             df['pos'] += 1
-            yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+            # yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+            st = SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
+            if st.shape[0] > 0:
+                yield st
             counter = 0
             data = []
 
