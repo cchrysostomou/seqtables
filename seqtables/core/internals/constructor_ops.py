@@ -161,7 +161,7 @@ def _seq_df_to_datarray(
             min_pos = df[map_cols['pos']].min()        
         if max_pos < 0:
             max_pos =  df[[map_cols['seqs'], map_cols['pos']]].apply(lambda x: x[1] - 1 + len(x[0]), axis=1).max()
-        print(min_pos, max_pos)
+        # print(min_pos, max_pos)
         # no need to do any alignment, juse use seq to dtarr func
         return _seqs_to_datarray(
             df[[map_cols['seqs'], map_cols['pos']]].apply(lambda x: trim_str(x[0], x[1], min_pos, max_pos, '$'), axis=1).values,
@@ -212,8 +212,12 @@ def _algn_seq_to_datarray(
     #     index = data[-1]
     # print('yadda', data[0].shape)
     if data[0].shape[0] == 0:
-        # print('data is removing')
+        print('data is removing')
         return xr.DataArray([]), {}            
+    # print('HEY ITS A SHAPE', data[0].shape)
+    # import pickle
+    # pickle.dump(data, open('saveapickle.pkl', 'wb'))
+
 
     # add in gaps and remove indels in cython fnc
     aligned_arrs = df_to_algn_arr(*data, edge_gap=ord(edge_gap), null_quality=ord(null_quality), min_pos=min_pos, max_pos=max_pos)  # , edgeGap='$')

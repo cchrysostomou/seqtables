@@ -5,6 +5,8 @@ cimport numpy as np
 cimport cython
 from cython.view cimport array as cvarray
 from libc.stdlib cimport malloc, free
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
+
 from libc.string cimport strcmp
 # from cpython.string cimport PyString_AsString
 from libc.stdlib cimport atoi
@@ -35,8 +37,8 @@ cdef regex_result cigar_breakdown(char* cigarstring, int strLen):
         ordered_mutations (list of tuples): an ordered list of all events (type, # of bases)
         mutation_summary (dict): a dict showing the number of times events were detected (i.e. total matches, total deletions)
     """
-    cdef int* tempEventCounts = <int *>malloc(strLen * sizeof(int))
-    cdef char* tempEventTypes = <char *>malloc(strLen * sizeof(char))
+    cdef int* tempEventCounts = <int *>PyMem_Malloc(strLen * sizeof(int))
+    cdef char* tempEventTypes = <char *>PyMem_Malloc(strLen * sizeof(char))
     cdef int regex_res = 0, current_str_pos = 0, matching_pos = 0, tmpStart, tmpStop, tmpNum = 0
     cdef char tmpEv
     cdef char* regexcigar = "[0-9]+[MIDNSHP=XB]"
@@ -89,18 +91,18 @@ cdef void extract_algn_seq(
     char *qualityFiller,
     char *sequenceFiller,
     int refLen,
-    int longestSequenceLengthFound
+    int longestSequenceLengthToStore
 ):
     cdef int refP = pos;  # position of REFERENCE
-    cdef int ind, seqP=0;
+    cdef int currInd = 0;  # position in destination READ matrix
+    cdef int seqP = 0; # position in the original READ
+    
+    cdef int ind;
     cdef char evt
     cdef int nevt
     cdef int ntmptmp, ntmp
-    cdef DTYPE_str_t tmp
-    cdef int currInd = 0  # position of READ
+    cdef DTYPE_str_t tmp    
     cdef int startP, finalP, adjust
-
-    seqLen = max_pos - min_pos + 1
 
     cdef char *sf = result[0]  #<char*>malloc(seqLen * sizeof(char))
     cdef char *qf = result[1]  #<char*>malloc(seqLen * sizeof(char))
@@ -111,21 +113,18 @@ cdef void extract_algn_seq(
 
     if pos > max_pos:
         # situtations where the entire read of interest/alignment STARTS AFTER the max_pos we want
-        # assert False, ('b', pos, max_pos)
-        substring(sf, sequenceFiller, 0, currInd, max_pos - min_pos + 1)
-        substring(qf, qualityFiller, 0, currInd, max_pos - min_pos + 1)
-        currInd += max_pos - min_pos + 1
+        substring(sf, sequenceFiller, 0, 0, longestSequenceLengthToStore, longestSequenceLengthToStore)
+        substring(qf, qualityFiller, 0, 0, longestSequenceLengthToStore, longestSequenceLengthToStore)
+        currInd = max_pos - min_pos + 1
         currIndStore[0] = currInd
         currIndStore[1] = insInd
         return
 
     if pos > min_pos:
         # alignmennt started after min pos, so add edge gaps  (i.e. '-', or '', or '$')
-       # assert pos - min_pos > 0, ('unexp pos here', pos, min_pos)
-       # assert pos - min_pos < longestSequenceLengthFound, ('f too long', max_pos, min_pos, pos, pos - min_pos)
-       substring(sf, sequenceFiller, 0, currInd, pos - min_pos)
-       substring(qf, qualityFiller, 0, currInd, pos - min_pos)
-       currInd += (pos - min_pos)
+        substring(sf, sequenceFiller, 0, 0, pos - min_pos, longestSequenceLengthToStore)
+        substring(qf, qualityFiller, 0, 0, pos - min_pos, longestSequenceLengthToStore)
+        currInd = (pos - min_pos)
 
     for ind in range(cigar.numHits):
         nevt = cigar.eventLengths[ind]
@@ -145,15 +144,15 @@ cdef void extract_algn_seq(
             # assert currInd >= 0, ('b', currInd, nevt)
             # assert currInd + nevt < longestSequenceLengthFound, ('a', currInd, nevt, longestSequenceLengthFound)
             # assert seqP + nevt <= refLen, (seqP, nevt, refLen)
-            substring(sf, seq, seqP, currInd, nevt)
-            substring(qf, qual, seqP, currInd, nevt)
+            substring(sf, seq, seqP, currInd, nevt, longestSequenceLengthToStore)
+            substring(qf, qual, seqP, currInd, nevt, longestSequenceLengthToStore)
             refP += nevt
             seqP += nevt
             currInd += nevt
         elif evt == 'I':
             if ((refP >= min_pos) & (refP<=max_pos)):
-                substring(sI, seq, seqP, insInd, nevt)
-                substring(qI, qual, seqP, insInd, nevt)
+                substring(sI, seq, seqP, insInd, nevt, longestSequenceLengthToStore)
+                substring(qI, qual, seqP, insInd, nevt, longestSequenceLengthToStore)
                 for tmpIns in range(nevt):
                     iP[insInd + tmpIns] = refP
                 insInd += nevt
@@ -167,8 +166,8 @@ cdef void extract_algn_seq(
                 else:
                     refP += nevt - adjust
                     nevt = adjust
-            add_gaps(sf, '-', currInd, nevt)
-            add_gaps(qf, '!', currInd, nevt)
+            add_gaps(sf, '-', currInd, nevt, longestSequenceLengthToStore)
+            add_gaps(qf, '!', currInd, nevt, longestSequenceLengthToStore)
             currInd += nevt
             refP += nevt
         elif evt == 'N':
@@ -180,8 +179,8 @@ cdef void extract_algn_seq(
                 else:
                     refP += nevt - adjust
                     nevt = adjust
-            add_gaps(sf, '.', currInd, nevt)
-            add_gaps(qf, '!', currInd, nevt)
+            add_gaps(sf, '.', currInd, nevt, longestSequenceLengthToStore)
+            add_gaps(qf, '!', currInd, nevt, longestSequenceLengthToStore)
             currInd += nevt
             refP += nevt
         elif evt == 'S':
@@ -200,10 +199,10 @@ cdef void extract_algn_seq(
     # print(refP, max_pos, currInd, seqLen, currInd + max_pos - refP, max_pos - refP + 1)
     if refP <= max_pos:
         # alignment ended before max position, so add edge gaps. i.e. ('-', '', '$')
-        substring(sf, sequenceFiller, 0, currInd, max_pos - refP + 1)
-        substring(qf, qualityFiller, 0, currInd, max_pos - refP + 1)
+        substring(sf, sequenceFiller, 0, currInd, max_pos - refP + 1, longestSequenceLengthToStore)
+        substring(qf, qualityFiller, 0, currInd, max_pos - refP + 1, longestSequenceLengthToStore)
         currInd += max_pos - refP + 1
-    elif refP > max_pos + 1:
+    elif refP > max_pos + 1:        
         # assert False, ('a', refP, max_pos, (refP - max_pos - 1))
         currInd -= (refP - max_pos - 1)
     # assert currInd == 4738, (pos, refP, currInd, max_pos, max_pos - min_pos + 1)
@@ -211,16 +210,18 @@ cdef void extract_algn_seq(
     currIndStore[1] = insInd
 
 
-cdef void substring(char* dest, char* src, int srcP, int destP, int cnt):
+cdef void substring(char* dest, char* src, int srcP, int destP, int cnt, int maximum_dest_index):
     cdef int i
     for i in range(cnt):
-        dest[destP + i] = src[srcP + i]
+        if destP + i < maximum_dest_index: # make sure we dont have a segementation fault when copying data over
+            dest[destP + i] = src[srcP + i]
     return
 
-cdef void add_gaps(char* var, char let, int p, int nLen):
+cdef void add_gaps(char* var, char let, int p, int nLen, int maximum_dest_index):
     cdef int i
     for i in range(p, p + nLen):
-        var[i] = let
+        if i < maximum_dest_index:  # make sure we dont have a segementation fault when copying data over
+            var[i] = let
 
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
@@ -239,18 +240,18 @@ cpdef df_to_algn_arr(
 
     cdef Py_ssize_t nSeq = seqs.shape[0], ind
     cdef int pI, passedSeq=0, insCounter=0, tmpInsPosMarker;
-    cdef char **seqR = <char**>malloc(4 * sizeof(char*))
-    cdef int **insPosInfo = <int**>malloc(1 * sizeof(int*))
+    cdef char **seqR = <char**>PyMem_Malloc(4 * sizeof(char*))
+    cdef int **insPosInfo = <int**>PyMem_Malloc(1 * sizeof(int*))
     cdef char* tmp
     cdef int currIndArr[2]
     currIndArr[0] = 0
     currIndArr[1] = 0
     cdef seqList = [], qualList = []
 
-    cdef regex_result *match_vec = <regex_result*>malloc(nSeq * (3 * sizeof(int) + 1 * sizeof(int*) + 1 * sizeof(char*) + 1 * sizeof(regex_result)))
+    cdef regex_result *match_vec = <regex_result*>PyMem_Malloc(nSeq * (3 * sizeof(int) + 1 * sizeof(int*) + 1 * sizeof(char*) + 1 * sizeof(regex_result)))
     cdef int maxPosStore = 0, tmpPosStore = 0, minPosStore = pos[0], maxTotalIns = 0;
     cdef multiindex_val = [], insData = [], successfullIndexes = []
-    cdef int longestSequenceLengthFound
+    cdef int longestSequenceLengthToStore
 
     for ind in range(nSeq):
         match_vec[ind] = cigar_breakdown(cigars[ind].encode(), len(cigars[ind]))
@@ -258,9 +259,9 @@ cpdef df_to_algn_arr(
         if (match_vec[ind].totalIns > maxTotalIns):
             maxTotalIns = match_vec[ind].totalIns
         if (tmpPosStore > maxPosStore):
-           maxPosStore = tmpPosStore
+            maxPosStore = tmpPosStore
         if (minPosStore > pos[ind]):
-           minPosStore = pos[ind]
+            minPosStore = pos[ind]
         
 
     if  (min_pos == -1): # (min_pos < 0):
@@ -270,23 +271,25 @@ cpdef df_to_algn_arr(
     if  (max_pos == -2):  # (min_pos > max_pos):
         # assume its not defined by user ....
         max_pos = maxPosStore
+        
+    assert min_pos < max_pos, 'Error, the minimum base position must be lower than the maximum base position: ' + str(min_pos) + ',' + str(max_pos)
     
     # print(minPosStore, maxPosStore)
+    longestSequenceLengthToStore = max_pos - min_pos + 1
+    print('Longest Sequence Length and Positions', longestSequenceLengthToStore, min_pos, max_pos, minPosStore, maxPosStore)
 
-    longestSequenceLengthFound = maxPosStore - minPosStore + 1
+    cdef char *qEmpty = <char*>PyMem_Malloc(longestSequenceLengthToStore * sizeof(char))  # this is the absolute largest a sequence can be
+    cdef char *sEmpty = <char*>PyMem_Malloc(longestSequenceLengthToStore * sizeof(char))
 
-    cdef char *qEmpty = <char*>malloc(longestSequenceLengthFound * sizeof(char))  # this is the absolute
-    cdef char *sEmpty = <char*>malloc(longestSequenceLengthFound * sizeof(char))
-
-    for ind in range(longestSequenceLengthFound):
+    for ind in range(longestSequenceLengthToStore):
         qEmpty[ind] = null_quality
         sEmpty[ind] = edge_gap
 
-    seqR[0] = <char*>malloc(longestSequenceLengthFound * sizeof(char))
-    seqR[1] = <char*>malloc(longestSequenceLengthFound * sizeof(char))
-    seqR[2] = <char*>malloc(maxTotalIns * sizeof(char))
-    seqR[3] = <char*>malloc(maxTotalIns * sizeof(char))
-    insPosInfo[0] = <int*>malloc(maxTotalIns * sizeof(int))
+    seqR[0] = <char*>PyMem_Malloc(longestSequenceLengthToStore * sizeof(char))
+    seqR[1] = <char*>PyMem_Malloc(longestSequenceLengthToStore * sizeof(char))
+    seqR[2] = <char*>PyMem_Malloc(maxTotalIns * sizeof(char))
+    seqR[3] = <char*>PyMem_Malloc(maxTotalIns * sizeof(char))
+    insPosInfo[0] = <int*>PyMem_Malloc(maxTotalIns * sizeof(int))
 
     for ind in range(nSeq):
         if (cigars[ind][0] == '*' and len(cigars[ind]) == 1):
@@ -305,13 +308,13 @@ cpdef df_to_algn_arr(
             qEmpty,
             sEmpty,
             len(seqs[ind]),
-            longestSequenceLengthFound
+            longestSequenceLengthToStore
         )
 
         successfullIndexes.append(indexes[ind])
 
-        free(match_vec[ind].eventLengths)
-        free(match_vec[ind].eventTypes)
+        PyMem_Free(match_vec[ind].eventLengths)
+        PyMem_Free(match_vec[ind].eventTypes)
 
         seqList.append(
             seqR[0][:currIndArr[0]]
@@ -352,16 +355,16 @@ cpdef df_to_algn_arr(
                 )
         passedSeq += 1
 
-    free(seqR[0])
-    free(seqR[1])
-    free(seqR[2])
-    free(seqR[3])
-    free(insPosInfo[0])
-    free(insPosInfo)
-    free(match_vec)
-    free(seqR)
-    free(qEmpty)
-    free(sEmpty)
+    PyMem_Free(seqR[0])
+    PyMem_Free(seqR[1])
+    PyMem_Free(seqR[2])
+    PyMem_Free(seqR[3])
+    PyMem_Free(insPosInfo[0])
+    PyMem_Free(insPosInfo)
+    PyMem_Free(match_vec)
+    PyMem_Free(seqR)
+    PyMem_Free(qEmpty)
+    PyMem_Free(sEmpty)
 
     seq_table = np.array(seqList, dtype='S').view('S1').reshape(passedSeq, -1)
     qual_table = np.array(qualList, dtype='S').view('S1').reshape(passedSeq, -1)
