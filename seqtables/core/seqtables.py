@@ -222,7 +222,7 @@ class SeqTable(xr.DataArray):
                 yield st
 
     @staticmethod
-    def from_pysam(alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', min_pos=-1, max_pos=-2):
+    def from_pysam(alignment_file, chunks=None, fetch_args=[], fetch_kwargs={}, seq_type='NT', store_additional_features=['mapping_quality'], min_mapping_quality=None, min_pos=-1, max_pos=-2):
         """
             Returns an iterator that reads through a sam file using pysam and then returns results in seqtable format
 
@@ -246,10 +246,15 @@ class SeqTable(xr.DataArray):
         counter = 0
         data = []
         for read in samfile_reader:        
-            data.append((read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring))
+            if min_mapping_quality is not None and read.mapping_quality < min_mapping_quality:
+                continue
+            read_info = [read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring]
+            for s in store_additional_features:
+                read_info.append(getattr(read, s))
+            data.append(read_info)
             counter += 1
             if counter == chunks:                    
-                df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')                                                
+                df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar'] + store_additional_features).set_index('header')                                                
                 # add 1 to the position because pysam treats positions from 0 index (converts position from bowtie to 0 base index)
                 df['pos'] += 1
                 # yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
@@ -260,7 +265,7 @@ class SeqTable(xr.DataArray):
                 data = []
             
         if len(data) > 0:
-            df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar']).set_index('header')
+            df = pd.DataFrame(data, columns=['header', 'rname', 'seq', 'qual', 'pos', 'cigar'] + store_additional_features).set_index('header')
             # add 1 to the position because pysam treats positions from 0 index
             df['pos'] += 1
             # yield SeqTable.from_df(df, index=df.index, seq_type=seq_type, min_pos=min_pos, max_pos=max_pos) 
@@ -393,7 +398,7 @@ class SeqTable(xr.DataArray):
         else:
             return xr.DataArray(self.sel(type='quality'))
 
-    def view_with_ins(self, positions=None, min_ins_count=0, ins_char='-', return_as_dataframe=True, include_quality=False):
+    def view_with_ins(self, positions=None, min_ins_count=0, ins_gap='-', return_as_dataframe=True, include_quality=False, lowercase_insertions=True):
         """
             Create a new stacked table where insertions are also represented as columns
 
@@ -438,7 +443,7 @@ class SeqTable(xr.DataArray):
         # print(len(is_in_position_of_interest), p1)
         # print(self.insertions.iloc[is_in_position_of_interest, :])
 
-        # finally we only want rows that are present in both filteres
+        # finally we only want rows that are present in both filteres        
         final_rows_to_select = np.where(keep_these_rows & is_in_position_of_interest)[0]
 
         # filtered_insertion_table = xarr[insertion_table_name].loc[(slice(None), filtered_ins_index[:, 0], filtered_ins_index[:, 1]), :]
@@ -450,7 +455,7 @@ class SeqTable(xr.DataArray):
                 columns=positions, index=self.read.values
             )
         else:
-            ins_table_seq = filtered_insertion_table['seq'].unstack(level=(1, 2), fill_value=ord(ins_char))
+            ins_table_seq = filtered_insertion_table['seq'].unstack(level=(1, 2), fill_value=ord(ins_gap) if lowercase_insertions is False else ord(ins_gap) - 32)
 
             # seqs_with_ins = pd.concat([
             #     pd.DataFrame(
@@ -458,17 +463,17 @@ class SeqTable(xr.DataArray):
             #         columns=positions, index=self.read.values
             #     ),
             #     ins_table_seq
-            # ], axis=1).fillna(ord(ins_char)).astype(np.uint8)
+            # ], axis=1).fillna(ord(ins_gap)).astype(np.uint8)
             
             seqs_with_ins = pd.DataFrame(
                 self.loc[:, positions, 'seq'].values.view(np.uint8),
                 columns=pd.MultiIndex.from_product([positions, [0]]), index=self.read.values
             ).merge(
-                ins_table_seq, 
+                ins_table_seq if lowercase_insertions is False else ins_table_seq + 32, 
                 left_index=True, 
                 right_index=True,
                 how='left'
-            ).dropna(how='all', axis=1).fillna(ord(ins_char)).astype(np.uint8)
+            ).dropna(how='all', axis=1).fillna(ord(ins_gap)).astype(np.uint8)
 
         # realign column sin table so that insertion bases are in the proper position with respect to referene positions
         cols = list(seqs_with_ins.columns)
@@ -551,7 +556,7 @@ class SeqTable(xr.DataArray):
         #     print(str(e))
         #     raise Exception('THE STEP IN VIEW WITH INS FAILED!!')
 
-    def slice_sequences(self, positions=None, name='seqs', name_qual='quals', include_insertions=False, return_quality=False, empty_chars=None, empty_quals=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True):
+    def slice_sequences(self, positions=None, name='seqs', name_qual='quals', include_insertions=False, return_quality=False, empty_chars=None, empty_quals=None, return_column_positions=False, min_ins_count=0, maintain_read_order=True, lowercase_insertions=True, ins_gap='-'):
         """
         positions (array/list): positions that we want to slice from table
         name (string): Name of the sequence column that is returned
@@ -596,10 +601,11 @@ class SeqTable(xr.DataArray):
             prepend = ''
             append = ''
 
-        if include_insertions:
-            tmp_data = self.view_with_ins(positions, min_ins_count=min_ins_count, include_quality=return_quality, return_as_dataframe=False)
+        if include_insertions and self.insertions is not None and self.insertions.empty is False:
+            tmp_data = self.view_with_ins(positions, min_ins_count=min_ins_count, include_quality=return_quality, return_as_dataframe=False, lowercase_insertions=lowercase_insertions, ins_gap=ins_gap)
         else:
             tmp_data = self.loc[:, positions]
+            # tmp_data.position = [(c, 0) for c in tmp_data.position.values]
 
         if maintain_read_order is True:
             # re-sort data
@@ -920,7 +926,7 @@ class SeqTable(xr.DataArray):
 
         return dist.fillna(0)
 
-    def get_substrings(self, word_length, positions=None, subsample_seqs=None, weights=None, include_insertions=False, min_ins_count=0):
+    def get_substrings(self, word_length, positions=None, subsample_seqs=None, weights=None, include_insertions=False, min_ins_count=0, lowercase_insertions=True, ins_gap='-'):
         """
             Useful function for counting the occurrences of all possible SUBSTRINGs within a sequence table
 
@@ -982,9 +988,9 @@ class SeqTable(xr.DataArray):
             else:
                 return 'p' + str(col)
 
-        if include_insertions:
+        if include_insertions and self.insertions is not None and self.insertions.empty is False:
             # stack insertions with bases
-            tmp_table = self.view_with_ins(positions=positions, min_ins_count=min_ins_count, return_as_dataframe=False, include_quality=False)
+            tmp_table = self.view_with_ins(positions=positions, min_ins_count=min_ins_count, return_as_dataframe=False, include_quality=False, lowercase_insertions=lowercase_insertions, ins_gap=ins_gap)
         else:
             # only slice the columns without insertions
             tmp_table = self.loc[:, list(self.position.values) if positions is None else list(positions), 'seq']
@@ -1228,15 +1234,19 @@ class SeqTable(xr.DataArray):
         total_bases = (quality_scores > (ord(self.null_qual) - self.phred_adjust)).sum(axis=1) if ignore_null_qual else self.shape[1]
         percent_above = (100.0 * ((quality_scores >= q).sum(axis=1))) / (1.0 * total_bases)
 
-        filtered = self[percent_above >= p]
-        ins_df = filtered.attrs.get('seqtable', {}).get('insertions')
-        if not(ins_df is None):
+        filtered = SeqTable(self[percent_above >= p])
+        filtered.attrs = copy.deepcopy(self.attrs)
+        ins_df = filtered.attrs.get('seqtable', {}).get('insertions').copy()
+        if not(ins_df is None) and ins_df.empty is False:
             # the following reads are still presnt
             present_reads = list(ins_df.index.levels[0].intersection(filtered.read.values))
             # now filter out the reads
-            filtered.attrs['seqtable']['insertions'] = ins_df.loc[present_reads]
-            filtered.insertions = filtered.attrs['seqtable']['insertions']
+            filtered.attrs['seqtable']['insertions'] = ins_df.loc[present_reads].copy()
+            
+            # filtered.insertions = filtered.attrs['seqtable']['insertions']
             del ins_df
+        else:
+            filtered.attrs['seqtable']['insertions'] = pd.DataFrame()
 
         return filtered
 
@@ -1261,7 +1271,11 @@ class SeqTable(xr.DataArray):
         if 'quality' not in self.type.values:
             raise Exception("You have not passed in any quality data for these sequences")
 
-        meself = self if inplace is True else self.copy()
+        if inplace is True:
+            meself = self 
+        else:
+            meself = self.copy()
+            meself.attrs = copy.deepcopy(self.attrs)
 
         if replace_with is None:
             replace_with = self.fill_na_val
@@ -1357,7 +1371,7 @@ class SeqTable(xr.DataArray):
 
     def seq_logo(self, positions=None, include_insertions=True, weights=None, method='freq', ignore_characters=[], min_ins_count=0, **kwargs):
         dist_no_ins = self.get_seq_dist(positions, method, ignore_characters, weights)
-        if include_insertions is True:
+        if include_insertions is True and (self.insertions is not None and self.insertions.shape[0] > 0):
             dist_with_ins = self.get_insertion_seq_dist(positions, method=method, min_ins_count=min_ins_count)
             merged_dist = pd.concat([dist_no_ins, dist_with_ins], axis=1).fillna(0)
         else:

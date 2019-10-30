@@ -137,8 +137,16 @@ def _seq_df_to_datarray(
     expected_map_cols.update(map_cols)
     map_cols = copy.deepcopy(expected_map_cols)
     ref_pos_names = defaultdict(list, ref_pos_names)
+    
+    # store these as an attribute
+    metadata_columns = [
+        c for c in df.columns
+        if c not in list(map_cols.values())
+    ]
+    
 
     assert 'seqs' in map_cols, 'Error you must provide the column name for sequences'
+
     # print(map_cols)
     has_quality = 'quals' in map_cols and map_cols['quals'] in df.columns
     # print(df.columns, map_cols['quals'], has_quality)
@@ -173,7 +181,10 @@ def _seq_df_to_datarray(
     if has_quality is False:
         df[map_cols['quals']] = ''
     
-
+    if len(metadata_columns) > 0:
+        metadata_df = pd.DataFrame(df[metadata_columns], index=index)
+    else:
+        metadata_df = pd.DataFrame()
 
     return _algn_seq_to_datarray(        
         ref_name,
@@ -189,12 +200,13 @@ def _seq_df_to_datarray(
         has_quality=has_quality,
         min_pos=min_pos,
         max_pos=max_pos,
-        ref_to_pos_dim=ref_to_pos_dict[ref_name] if ref_name in ref_to_pos_dict else None
+        ref_to_pos_dim=ref_to_pos_dict[ref_name] if ref_name in ref_to_pos_dict else None,
+        read_info=metadata_df
     )
 
 
 def _algn_seq_to_datarray(
-    ref_name, seq_type, phred_adjust, data, has_quality, ref_to_pos_dim=None, min_pos=-1, max_pos=-2, edge_gap='$', null_quality='!'
+    ref_name, seq_type, phred_adjust, data, has_quality, ref_to_pos_dim=None, min_pos=-1, max_pos=-2, edge_gap='$', null_quality='!', read_info=pd.DataFrame()
 ):
     """
         Create sets of xarray dataarrays from the variable data
@@ -345,7 +357,8 @@ def _algn_seq_to_datarray(
     }
 
     attrs = {
-        'seqtable': metadata
+        'seqtable': metadata,
+        'read_info': read_info
     }
 
     return seq_xr, attrs
