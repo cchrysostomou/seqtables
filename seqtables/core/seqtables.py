@@ -248,7 +248,8 @@ class SeqTable(xr.DataArray):
         for read in samfile_reader:        
             if min_mapping_quality is not None and read.mapping_quality < min_mapping_quality:
                 continue
-            read_info = [read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring]
+            # read_info = [read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring]
+            read_info = [read.query_name, read.reference_name, read.query_sequence, read.query_qualities, read.reference_start, read.cigarstring]
             for s in store_additional_features:
                 read_info.append(getattr(read, s))
             data.append(read_info)
