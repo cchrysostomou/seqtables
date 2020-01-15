@@ -47,7 +47,7 @@ setup(
      author='Constantine Chrysostomou', 
      author_email='cchrysos1@gmail.com',
      url='https://github.com/cchrysostomou/seqtables',
-     download_url='https://github.com/user/seqtables/archive/v_01.tar.gz',
+     download_url='https://github.com/cchrysostomou/seqtables/archive/v_01.tar.gz',
      keywords=['NGS', 'Next generation sequencing', 'dataframe', 'protein engineering', 'amplicon', 'numpy', 'variant analysis', 'sequence logo', 'enrichment'],
      packages=find_packages(),
      cmdclass={'build_ext': _build_ext},
