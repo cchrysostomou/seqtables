@@ -185,16 +185,16 @@ def _seq_df_to_datarray(
         metadata_df = pd.DataFrame(df[metadata_columns], index=index)
     else:
         metadata_df = pd.DataFrame()
-
+    
     return _algn_seq_to_datarray(        
         ref_name,
         seq_type,
-        phred_adjust=33,
+        phred_adjust=33,        
         data=[
             df[map_cols['seqs']].values,
             df[map_cols['quals']].values,  # if has_quality is True else None, # np.array([]),
             df[map_cols['pos']].astype(np.int64).values,
-            df[map_cols['cigar']].values,
+            df[map_cols['cigar']].astype(str).values,
             np.array(list(index))
         ],
         has_quality=has_quality,
@@ -232,6 +232,7 @@ def _algn_seq_to_datarray(
 
 
     # add in gaps and remove indels in cython fnc
+    
     aligned_arrs = df_to_algn_arr(*data, edge_gap=ord(edge_gap), null_quality=ord(null_quality), min_pos=min_pos, max_pos=max_pos)  # , edgeGap='$')
 
     # has_quality = data[1].shape[0] > 0

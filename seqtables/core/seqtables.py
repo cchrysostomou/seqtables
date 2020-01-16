@@ -18,6 +18,8 @@ from six import string_types
 from collections import defaultdict
 import itertools
 from orderedset import OrderedSet
+import pysam
+import os
 
 def df_to_dataarray(
     df, 
@@ -235,6 +237,10 @@ class SeqTable(xr.DataArray):
             Returns:
                 Iterator to seqtable object                
         """
+        if isinstance(alignment_file, string_types):
+            assert os.path.isfile(alignment_file), 'The alignment BAM/SAM file does not exist: ' + alignment_file
+            alignment_file = pysam.AlignmentFile(alignment_file)
+
         try:
             samfile_reader = alignment_file.fetch(*fetch_args, **fetch_kwargs)
         except ValueError:
@@ -249,7 +255,7 @@ class SeqTable(xr.DataArray):
             if min_mapping_quality is not None and read.mapping_quality < min_mapping_quality:
                 continue
             # read_info = [read.query_name, read.reference_name, read.seq, read.qual, read.pos, read.cigarstring]
-            read_info = [read.query_name, read.reference_name, read.query_sequence, read.query_qualities, read.reference_start, read.cigarstring]
+            read_info = [read.query_name, read.reference_name, read.query_sequence, read.qual, read.reference_start, read.cigarstring]
             for s in store_additional_features:
                 read_info.append(getattr(read, s))
             data.append(read_info)
