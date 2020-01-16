@@ -14,7 +14,7 @@ except ImportError:
 
 print('CYTHON WAS FOUND: ', have_cython)
 
-INSTALL_REQUIRES = ['future', 'numpy >= 1.14', 'pandas >= 0.18.0', 'xarray', 'orderedset']  # scipy
+INSTALL_REQUIRES = ['future', 'numpy >= 1.14', 'pandas >= 0.18.0', 'xarray', 'orderedset', 'pysam']  # scipy
 
 if have_cython:    
     ext_modules  = [
@@ -55,7 +55,7 @@ setup(
      ext_modules=ext_modules,
      classifiers=[
         'Development Status :: 4 - Beta',     
-        'Intended Audience :: Developers and biological data scientists',     
+        'Intended Audience :: Science/Research',     
         'Topic :: Software Development :: Build Tools',
         'License :: OSI Approved :: MIT License', 
         'Programming Language :: Python :: 3',    
